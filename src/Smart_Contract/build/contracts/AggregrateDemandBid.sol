@@ -2,7 +2,8 @@ pragma solidity 0.5.3;
 
 contract AggregrateDemandBid {
   //Beneficiary is the account that holds all the bids
-  address public beneficiary;
+  address public beneficiary = 0xcfc7496aa1a52ACfE5bdB51A4dbDcAa86B84573F;
+  address public account = 0x5e6595e972EE1C672CfdbA71602945343fA0ce8D;
   //time periods in seconds or seconds since 1970-01-01
   uint public auctionEnd;
 
@@ -16,6 +17,7 @@ contract AggregrateDemandBid {
   uint8 private agentCount;
   uint private highestInterval;
   uint private lowestInterval;
+  uint public moneyInTheContract;
 
   //settlement value (actual consumption)
   uint settlementValue;
@@ -27,11 +29,11 @@ contract AggregrateDemandBid {
   }
 
   //create a simple
-  constructor {
-    uint _biddingTime,
-    address payable _beneficiary
-  } public {
-    beneficiary = _beneficiary;
+  constructor (
+    uint _biddingTime
+    //address payable _beneficiary
+  ) public {
+    //beneficiary = _beneficiary;
     auctionEnd = now + _biddingTime;
   }
 
@@ -52,13 +54,14 @@ contract AggregrateDemandBid {
   }*/
 
   //Bid on the auction with the value send together with this transaction
-  function submitBet() public payable {
+  function submitBet(uint amount) public payable {
     //No arguments are necessary, all
-
     //Revert the call if the bidding period is over.
     require (now <= auctionEnd, "Auction already ended.");
 
-    agent_predictions[msg.sender].guess =  msg.value;
+    agent_predictions[msg.sender].guess =  amount;
+
+    moneyInTheContract += msg.value;
 
     agentCount += 1;
 
@@ -71,8 +74,9 @@ contract AggregrateDemandBid {
 
     if (agent_predictions[msg.sender].guess >= lowestInterval &&
     agent_predictions[msg.sender].guess <= highestInterval &&
-    !agent_predictions[msg.sender].claimed && closed) {
-      msg.sender.send(2);
+    !agent_predictions[msg.sender].claimed) {
+        // &&closed
+      msg.sender.send(10**18);
       agent_predictions[msg.sender].claimed = true;
       return true;
     }
@@ -102,11 +106,11 @@ contract AggregrateDemandBid {
   }
 
   function findHighestInterval() private {
-    highestInterval = settlementValue + 0.05 * settlementValue;
+    highestInterval = settlementValue + settlementValue / 20;
   }
 
   function findLowestInterval() private {
-    lowestInterval = settlementValue - 0.05 * settlementValue;
+    lowestInterval = settlementValue - settlementValue / 20;
   }
 
   function findNumberOfAgentWithinInterval() private returns (uint) {
@@ -117,24 +121,8 @@ contract AggregrateDemandBid {
     return getPot() / findNumberOfAgentWithinInterval();
   }
 
-  function getPot() private returns (uint) {
-      return agentCount;
-  }
-
-  function sendCoin(address receiver, uint amount) public returns(bool sufficient) {
-    if (balances[msg.sender] < amount) return false;
-    balances[msg.sender] -= amount;
-    balances[receiver] += amount;
-    emit Transfer(msg.sender, receiver, amount);
-    return true;
-  }
-
-  function getBalanceInEth(address addr) public view returns(uint){
-    return ConvertLib.convert(getBalance(addr),2);
-  }
-
-  function getBalance(address addr) public view returns(uint) {
-    return balances[addr];
+  function getPot() public returns (uint) {
+      return moneyInTheContract;
   }
 
   //get settlementValue from energy supplier and set the settlement Value
