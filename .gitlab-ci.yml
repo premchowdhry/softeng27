@@ -3,14 +3,14 @@ stages:
   - test
 
 build:
-  image: python3.7
+  image: python3.7-alpine
   stage: build
   script:
     - echo "building..."
     - pip install -r requirments.txt
 
 test:
-  image: python3.7
+  image: python3.7-alpine
   stage: test
   script:
     - echo "testing..."
