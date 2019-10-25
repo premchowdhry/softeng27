@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
 
+import preprocess as pp
+
 stime = time.time()
 
 #Matern kernel parameters are in order - amplitude, lengthscale, roughness
@@ -22,8 +24,11 @@ w_ker = WhiteKernel(noise_level = 1)
 kernel = m_ker + c_ker + w_ker
 
 #Our training data - energy consumption E at time T
-T_tr = [[0], [1], [2], [3], [4], [5]]
-E_tr = [5, 6, 7, 8, 9, 10]
+# T_tr = [[0], [1], [2], [3], [4], [5]]
+# E_tr = [5, 6, 7, 8, 9, 10]
+T_tr, E_tr = pp.create_all_agg_demands()
+T_tr, T_pred = T_tr[:-6], T_tr[-6:]
+E_Tr, E_actual = E_tr[:-6], E_tr[-6:]
 
 #Pass our kernel to the GP Regressor and set the number of times we re-run
 #the optimizer in computing the hyperparameters
@@ -35,9 +40,9 @@ gpr.fit(T_tr, E_tr)
 # Predict new energy values over the supplied time range
 T_pred = [[6], [7], [8], [9], [10]]
 E_actual = [8.5, 9.5, 9, 10, 11]
-E_pred, std_dev = gpr.predict(T_pred, return_std = True)	
+E_pred, std_dev = gpr.predict(T_pred, return_std = True)
 
-# Plot results 
+# Plot results
 plt.figure(figsize=(10, 5))
 lw = 2
 plt.scatter(T_tr + T_pred, E_tr + E_actual, c='k', label = 'Data')
@@ -52,4 +57,3 @@ plt.ylim(0, 15)
 plt.title('Home Energy Consumption')
 plt.legend(loc="best",  scatterpoints=1, prop={'size': 8})
 plt.show()
-

@@ -1,6 +1,7 @@
 import pandas as pd
 import csv
 from datetime import datetime
+import numpy as np
 import dask.dataframe as dd
 
 ENERGY_DATASET = "src/dataset/Power-Networks-LCL-June2015(withAcornGps)v2.csv"
@@ -17,20 +18,37 @@ def replaceNull(u):
     try:
         return float(u)
     finally:
-        return 0
+        return 0.0
+
+def convert_float(s):
+    try:
+        return s
+    finally:
+        return "Fail"
 
 
 def create_all_agg_demands():
 
-    dataset = dd.read_csv(ENERGY_DATASET, names=columns, header=0, converters={'KWH/hh (per half hour)':replaceNull})
-
+    dataset = dd.read_csv(ENERGY_DATASET, names=columns, header=0, converters={'KWH/hh (per half hour)':replaceNull}, low_memory=False)
     dataset = dataset.drop(columns = to_drop)
+    dataset = dataset.get_partition(0)
 
-    # print(dataset.head())
-    print(dataset.isnull())
-    # dataset = dataset[~dataset.usage.isnull()]
-    #dataset.drop([c for c in dataset.columns if dataset[c].isnull().any().compute()], axis=0)
     demands = dataset[['dateTime', 'usage']].groupby('dateTime')
-    demands.usage.sum().compute()
+    agg_demands_df = demands.usage.sum().reset_index().compute()
+    agg_demands_array = agg_demands_df.values
+
+    days = []
+    for d in agg_demands_array[:, 0]:
+        days.append([d])
+    aggs = []
+    for a in agg_demands_array[:, 1]:
+        val = None
+        try:
+            val = float(a.split()[0])
+        except ValueError:
+            val = 0.0
+        aggs.append(val)
+
+    return days, aggs
 
 create_all_agg_demands()
