@@ -1,0 +1,17 @@
+stages:
+  - build
+  - test
+
+build:
+  image: python3.7
+  stage: build
+  script:
+    - echo "building..."
+    - pip install -r requirments.txt
+
+test:
+  image: python3.7
+  stage: test
+  script:
+    - echo "testing..."
+    - pip install -r requirments.txt
