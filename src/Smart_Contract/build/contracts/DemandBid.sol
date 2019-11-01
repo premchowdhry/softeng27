@@ -1,20 +1,27 @@
 pragma solidity 0.5.11;
-import "github.com/OpenZeppelin/zeppelin-solidity/contracts/math/SafeMath.sol";
+//import "github.com/OpenZeppelin/zeppelin-solidity/contracts/math/SafeMath.sol";
 //import "github.com/Arachnid/solidity-stringutils/strings.sol";
 import "./DateTime.sol";
 
 contract DemandBid {
     //length of round (24 hours, 00:00 - 23:59:59:99)
-    uint public auctionLength = 86400;
+    uint public auctionLength;
 
     DateTime date = new DateTime();
-    SafeMath safeMath = new SafeMath();
+    //SafeMath safeMath = new SafeMath();
 
     //uint256 is the date
     mapping (address => mapping (uint => Bet_Info)) agent_details;
     mapping (uint => Round) round_info;
-    uint256 currentDay = date.getDay(now);
 
+    //initialises day = 0
+    uint currentDay = 0;
+    uint secondInit;
+
+    constructor(uint _auctionLength) public {
+        secondInit = now;
+        auctionLength = _auctionLength;
+    }
 
     struct Round {
         uint date;
@@ -50,12 +57,12 @@ contract DemandBid {
 
 
         //check if
-        /*if ((now / auctionLength) != currentDay) {
+        if (((now - secondInit) / auctionLength) != currentDay) {
 
-              currentDay += 1;
+              currentDay = (now - secondInit) / auctionLength;
               //calculate rewards for previous day
 
-        }*/
+        }
 
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
@@ -67,43 +74,57 @@ contract DemandBid {
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
 
-
-
         //for testing
-        nextDay();
+        //nextDay();
 
 
     }
 
+    //Only use for testing
     function nextDay() public {
-        currentDay = currentDay + 1 days;
+        //add 86400sec to now - secondInit
+        currentDay = (now - secondInit + 1 days) / auctionLength;
         setSettlementValue();
     }
 
+    function getNow() public returns (uint) {
+        uint x = now;
+        return x;
+    }
 
-    function withdraw() public {
 
-        uint total_sum = 0;
-        for (uint i = currentDay - 1 days; i >= 0; i =  i - 1 days) {
-            if (agent_details[msg.sender][i].claimed) {
-                break;
-            } else {
-                /*if (agent_details[msg.sender][i].bet_hashes_correct) {
+    function withdraw(uint _prediction) public {
 
-                }*/
-                total_sum =  SafeMath.add(agent_details[msg.sender][i].reward, total_sum);
-                agent_details[msg.sender][i].claimed = true;
+        //uint total_sum = 0;
+        // currentDay = (now - secondInit) / auctionLength;
+        // for (uint i = currentDay; i >= 0; i--) {
+        //     if (!agent_details[msg.sender][i].claimed) {
+        //         (msg.sender).transfer(agent_details[msg.sender][i].reward);
+        //     } else {
+        //         /*if (agent_details[msg.sender][i].bet_hashes_correct) {
 
-            }
-        }
+        //         }*/
+        //         //total_sum =  SafeMath.add(agent_details[msg.sender][i].reward, total_sum);
+        //         //agent_details[msg.sender][i].claimed = true;
 
-        if (total_sum >= 0) {
+        //         break;
+        //     }
+        // }
+
+        /*if (total_sum >= 0) {
             (msg.sender).transfer(1 ether);
-        }
+        }*/
 
 
         //(msg.sender).transfer(1 ether);
 
+        currentDay = (now - secondInit) / auctionLength;
+
+        if (!agent_details[msg.sender][currentDay--].claimed) {
+            uint ytdReward = agent_details[msg.sender][currentDay--].reward;
+
+            (msg.sender).transfer((ytdReward));
+        }
 
     }
 
@@ -114,23 +135,26 @@ contract DemandBid {
 
     //return the day that the auction is in right now
     function getDayCount() public view returns (uint) {
-      return currentDay;
+      return (now - secondInit) / auctionLength;
     }
 
     function findHighestInterval() private returns (uint) {
-        return round_info[currentDay].settlement_value + round_info[currentDay].settlement_value / 20;
+        currentDay = (now - secondInit) / auctionLength;
+        return round_info[currentDay/auctionLength].settlement_value + round_info[currentDay/auctionLength].settlement_value / 20;
     }
 
     function findLowestInterval() private returns (uint) {
-        return round_info[currentDay].settlement_value - round_info[currentDay].settlement_value / 20;
+        currentDay = (now - secondInit) / auctionLength;
+        return round_info[currentDay/auctionLength].settlement_value - round_info[currentDay/auctionLength].settlement_value / 20;
     }
 
   //get settlementValue from energy supplier and set the settlement Value
   function setSettlementValue() public {
     //settlementValue = get_settlement_from_energy_supplier();
-    round_info[currentDay- 1 days].settlement_value = 4200;
-    round_info[currentDay--].higherInterval = findHighestInterval();
-    round_info[currentDay--].lowerInterval = findLowestInterval();
+    currentDay = (now - secondInit) / auctionLength;
+    round_info[(currentDay--) / auctionLength].settlement_value = 4200;
+    round_info[(currentDay--) / auctionLength].higherInterval = findHighestInterval();
+    round_info[(currentDay--) / auctionLength].lowerInterval = findLowestInterval();
   }
 
 
