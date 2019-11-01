@@ -140,21 +140,21 @@ contract DemandBid {
 
     function findHighestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
-        return round_info[currentDay/auctionLength].settlement_value + round_info[currentDay/auctionLength].settlement_value / 20;
+        return round_info[currentDay].settlement_value + round_info[currentDay/].settlement_value / 20;
     }
 
     function findLowestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
-        return round_info[currentDay/auctionLength].settlement_value - round_info[currentDay/auctionLength].settlement_value / 20;
+        return round_info[currentDay].settlement_value - round_info[currentDay].settlement_value / 20;
     }
 
   //get settlementValue from energy supplier and set the settlement Value
   function setSettlementValue() public {
     //settlementValue = get_settlement_from_energy_supplier();
     currentDay = (now - secondInit) / auctionLength;
-    round_info[(currentDay--) / auctionLength].settlement_value = 4200;
-    round_info[(currentDay--) / auctionLength].higherInterval = findHighestInterval();
-    round_info[(currentDay--) / auctionLength].lowerInterval = findLowestInterval();
+    round_info[(currentDay--)].settlement_value = 4200;
+    round_info[(currentDay--)].higherInterval = findHighestInterval();
+    round_info[(currentDay--)].lowerInterval = findLowestInterval();
   }
 
 
