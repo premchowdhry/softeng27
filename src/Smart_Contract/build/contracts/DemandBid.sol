@@ -30,6 +30,8 @@ contract DemandBid {
         uint settlement_value;
         uint higherInterval;
         uint lowerInterval;
+        uint number_agent_inside_interval;
+        uint sum_relativeness;
     }
 
     struct Bet_Info {
@@ -39,6 +41,8 @@ contract DemandBid {
         uint reward;
         bool claimed;
         bool bet_hashes_correct;
+        bool insideInterval;
+        uint relativeness;
     }
 
 
@@ -68,7 +72,10 @@ contract DemandBid {
         agent_details[msg.sender][currentDay].betAmount = msg.value;
         //agent_details[msg.sender][currentDay].prediction = _prediction;
         agent_details[msg.sender][currentDay].hash_prediction = _blindedBid;
+
+        // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
         agent_details[msg.sender][currentDay].reward = msg.value;
+
         agent_details[msg.sender][currentDay].claimed = false;
         round_info[currentDay].total_pot += msg.value;
         round_info[currentDay].number_of_players += 1;
@@ -140,7 +147,7 @@ contract DemandBid {
 
     function findHighestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
-        return round_info[currentDay].settlement_value + round_info[currentDay/].settlement_value / 20;
+        return round_info[currentDay].settlement_value + round_info[currentDay].settlement_value / 20;
     }
 
     function findLowestInterval() private returns (uint) {
@@ -157,6 +164,24 @@ contract DemandBid {
     round_info[(currentDay--)].lowerInterval = findLowestInterval();
   }
 
+  //user needs to insert the length of their guess value that is inside the _predictionAndPassword
+  //get the prediction by the first _guessLength in _predictionAndPassword
+  function revealBet(uint _guessLength, string memory _predictionAndPassword) public {
+      currentDay = (now - secondInit) / auctionLength;
+      //check if the keccak of the _predictionAndPassword is the same as the one inserted in submitBet
+      uint _prediction = hashSlicing(_guessLength, _predictionAndPassword);
+      agent_details[msg.sender][currentDay--].prediction = _prediction;
+
+  }
+
+  //returns the prediction from the _predictionAndPassword string(bytes32)
+  function hashSlicing(uint _end, string memory _string) private pure returns (uint) {
+      bytes memory a = new bytes (_end - 1);
+      for (uint i = 0; i <= _end; i++) {
+          //fix array index out of bound
+          a[i] = bytes(_string)[i - 1];
+      }
+  }
 
   /*//Attach the string _predictionHash to the end of the prediction and see if it has the same
   function revealBet(uint _prediction, string memory _password) public {
@@ -167,9 +192,9 @@ contract DemandBid {
       //as the string concat of prediction + predictionHash
       //e.g. 4200Hello123
 
-      string predictionStr;
+      string memory predictionStr;
 
-      string hashStr = predictionStr.toSlice().concat(_password.toSlice());
+      string hashStr;  = predictionStr.toSlice().concat(_password.toSlice());
 
       if (agent_details[msg.sender][currentDay--].hash_prediction == keccak256(hashStr)) {
           agent_details[msg.sender][currentDay--].prediction = _prediction;
@@ -182,6 +207,50 @@ contract DemandBid {
       }
 
   }*/
+
+
+
+  //need sorted list for how close the
+  //?? call this function when calling withdraw function ??
+  function checkIfInsideInterval() private {
+      currentDay = (now - secondInit) / auctionLength;
+      if (agent_details[msg.sender][currentDay--].prediction <= round_info[currentDay--].higherInterval &&
+      agent_details[msg.sender][currentDay--].prediction >= round_info[currentDay--].lowerInterval) {
+          agent_details[msg.sender][currentDay--].insideInterval = true;
+          round_info[currentDay--].number_agent_inside_interval += 1;
+      }
+
+  }
+
+  //calculate the relativeness value and set the relativeness in the struct at the end
+  //calculate by the inverse of the differences between the settlement_value and the guess
+  //then multiply it with the betAmount
+  function calculateRelativeBetAndCloseness() private {
+      currentDay = (now - secondInit) / auctionLength;
+      uint difference_from_settlement_value;
+      if (round_info[currentDay--].settlement_value > agent_details[msg.sender][currentDay--].prediction) {
+          difference_from_settlement_value = round_info[currentDay--].settlement_value - agent_details[msg.sender][currentDay--].prediction;
+      } else {
+          difference_from_settlement_value = agent_details[msg.sender][currentDay--].prediction - round_info[currentDay--].settlement_value;
+      }
+
+      uint _relativeness = (1 / difference_from_settlement_value) * agent_details[msg.sender][currentDay--].betAmount;
+
+      //maybe needs to have a parameter name relative
+
+      agent_details[msg.sender][currentDay--].relativeness = _relativeness;
+      round_info[currentDay--].sum_relativeness += _relativeness;
+
+
+  }
+
+  //Can only calculate the reward on the day you withdraw
+  function calculateReward() private {
+      currentDay = (now - secondInit) / auctionLength;
+      uint _reward = (agent_details[msg.sender][currentDay-2].relativeness / round_info[currentDay-2].sum_relativeness) * round_info[currentDay-2].total_pot;
+      agent_details[msg.sender][currentDay-2].reward = _reward;
+  }
+
 
 
 
