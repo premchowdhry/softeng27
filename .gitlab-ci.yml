@@ -7,11 +7,9 @@ build:
   stage: build
   script:
     - echo "building..."
-    - pip install -r requirments.txt
 
 test:
   image: python:3.7-alpine
   stage: test
   script:
     - echo "testing..."
-    - pip install -r requirments.txt
