@@ -1,4 +1,4 @@
-pragma solidity 0.5.11;
+pragma solidity 0.4.26;
 //import "github.com/OpenZeppelin/zeppelin-solidity/contracts/math/SafeMath.sol";
 //import "github.com/Arachnid/solidity-stringutils/strings.sol";
 import "./DateTime.sol";
@@ -172,16 +172,61 @@ contract DemandBid {
       uint _prediction = hashSlicing(_guessLength, _predictionAndPassword);
       agent_details[msg.sender][currentDay--].prediction = _prediction;
 
+
+      //then compare keccak256(_predictionAndPassword) and the prediction (in hashes)
+
   }
 
   //returns the prediction from the _predictionAndPassword string(bytes32)
-  function hashSlicing(uint _end, string memory _string) private pure returns (uint) {
-      bytes memory a = new bytes (_end - 1);
-      for (uint i = 0; i <= _end; i++) {
-          //fix array index out of bound
-          a[i] = bytes(_string)[i - 1];
-      }
+  //by slicing the string using index
+  function hashSlicing(uint _index, string  _string) public pure returns (uint) {
+
+        //slice string
+        bytes memory a = new bytes(_index);
+        for(uint i=0;i<=_index-1;i++){
+            a[i] = bytes(_string)[i];
+        }
+
+        //convert string to uint
+        uint result = stringToUint(string(a));
+        return result;
   }
+
+  function getSlice(uint begin, uint end, string text) public pure returns (string) {
+        bytes memory a = new bytes(end-begin+1);
+        for(uint i=0;i<=end-begin;i++){
+            a[i] = bytes(text)[i+begin-1];
+        }
+        return string(a);
+    }
+
+  //convert string to uint
+  function stringToUint(string _s) public pure returns (uint result) {
+      bytes memory b = bytes(_s);
+      result = 0;
+      for (uint i = 0; i < b.length; i++) {
+          if (b[i] >= 48 && b[i] <= 57) {
+              result = result * 10 + (uint(b[i]) - 48);
+          }
+      }
+      return result;
+  }
+
+  function uintToString(uint v) public pure returns (string str) {
+        uint maxlength = 100;
+        bytes memory reversed = new bytes(maxlength);
+        uint i = 0;
+        while (v != 0) {
+            uint remainder = v % 10;
+            v = v / 10;
+            reversed[i++] = byte(48 + remainder);
+        }
+        bytes memory s = new bytes(i + 1);
+        for (uint j = 0; j <= i; j++) {
+            s[j] = reversed[i - j];
+        }
+        str = string(s);
+    }
 
   /*//Attach the string _predictionHash to the end of the prediction and see if it has the same
   function revealBet(uint _prediction, string memory _password) public {
@@ -250,10 +295,6 @@ contract DemandBid {
       uint _reward = (agent_details[msg.sender][currentDay-2].relativeness / round_info[currentDay-2].sum_relativeness) * round_info[currentDay-2].total_pot;
       agent_details[msg.sender][currentDay-2].reward = _reward;
   }
-
-
-
-
 
 
 }
