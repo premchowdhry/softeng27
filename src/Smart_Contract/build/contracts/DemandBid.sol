@@ -32,6 +32,7 @@ contract DemandBid {
         uint lowerInterval;
         uint number_agent_inside_interval;
         uint sum_relativeness;
+        bool settlement_is_set;
     }
 
     struct Bet_Info {
@@ -115,7 +116,7 @@ contract DemandBid {
         return x;
     }
 
-
+    //withdraw function can only be called on day2
     function withdraw(uint _prediction) public {
 
         //uint total_sum = 0;
@@ -151,16 +152,37 @@ contract DemandBid {
 
     }
 
-    function getRewardAmount() public view returns (uint) {
-        return agent_details[msg.sender][0].reward;
+    function withdrawWithout() public {
+        currentDay = (now - secondInit) / auctionLength;
+        require(currentDay > 1, "No available withdraws yet");
+
+        //check whether the settlement_value for the day has been set
+        //if the settlement value has not been set = it has been call the first time for that day
+        if (!round_info[currentDay-2].settlement_is_set) {
+
+            setSettlementValue();
+            round_info[currentDay-2].settlement_is_set = true;
+        }
+
+        //then just need to compare the bet with the intervals
+        if (checkIfInsideInterval()) {
+            //create a sorted list for storing the closest bet to the actual settlement value
+
+        }
 
     }
 
-    //return the day that the auction is in right now
+    // return the rewardAmount of the msg.sender on the day specify
+    function getRewardAmount(uint day) public view returns (uint) {
+        return agent_details[msg.sender][day].reward;
+    }
+
+    // return the day that the auction is in right now
     function getDayCount() public view returns (uint) {
       return (now - secondInit) / auctionLength;
     }
 
+    // using 5% interval
     function findHighestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
         return round_info[currentDay].settlement_value + round_info[currentDay].settlement_value / 20;
@@ -171,20 +193,27 @@ contract DemandBid {
         return round_info[currentDay].settlement_value - round_info[currentDay].settlement_value / 20;
     }
 
-  //get settlementValue from energy supplier and set the settlement Value
+  // get settlementValue from energy supplier and set the settlement Value
+  // also calculate the highest and lowest interval
+  // starting from day0, settlement_value is set on day2
   function setSettlementValue() public {
-    //settlementValue = get_settlement_from_energy_supplier();
+    // settlementValue = get_settlement_from_energy_supplier();
     currentDay = (now - secondInit) / auctionLength;
-    round_info[(currentDay--)].settlement_value = 4200;
-    round_info[(currentDay--)].higherInterval = findHighestInterval();
-    round_info[(currentDay--)].lowerInterval = findLowestInterval();
+
+    require(currentDay > 1, "Cannot set settlement value yet");
+
+    round_info[(currentDay-2)].settlement_value = 4200;
+    round_info[(currentDay-2)].higherInterval = findHighestInterval();
+    round_info[(currentDay-2)].lowerInterval = findLowestInterval();
   }
 
   //user needs to insert the length of their guess value that is inside the _predictionAndPassword
   //get the prediction by the first _guessLength in _predictionAndPassword
+  //revealBet is called on day 1;
   function revealBet(uint _guessLength, string memory _predictionAndPassword) public returns (bool) {
 
       currentDay = (now - secondInit) / auctionLength;
+      require(currentDay > 0, "Cannot reveal bet at this time");
 
       emit keccak256Hash(keccak256(_predictionAndPassword));
       emit HashPrediction(agent_details[msg.sender][currentDay--].hash_prediction);
@@ -198,12 +227,14 @@ contract DemandBid {
         agent_details[msg.sender][currentDay--].prediction = _prediction;
 
         emit predictionMatchesHash(_prediction);
+        agent_details[msg.sender][currentDay--].bet_hashes_correct = true;
         return true;
 
       }
 
-      return false;
+      agent_details[msg.sender][currentDay--].bet_hashes_correct = false;
 
+      return false;
 
   }
 
@@ -287,17 +318,17 @@ contract DemandBid {
 
   }*/
 
-
-
   //need sorted list for how close the
   //?? call this function when calling withdraw function ??
-  function checkIfInsideInterval() private {
+  function checkIfInsideInterval() private returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
-      if (agent_details[msg.sender][currentDay--].prediction <= round_info[currentDay--].higherInterval &&
-      agent_details[msg.sender][currentDay--].prediction >= round_info[currentDay--].lowerInterval) {
-          agent_details[msg.sender][currentDay--].insideInterval = true;
-          round_info[currentDay--].number_agent_inside_interval += 1;
+      if (agent_details[msg.sender][currentDay-2].prediction <= round_info[currentDay-2].higherInterval &&
+      agent_details[msg.sender][currentDay-2].prediction >= round_info[currentDay-2].lowerInterval) {
+          agent_details[msg.sender][currentDay-2].insideInterval = true;
+          round_info[currentDay-2].number_agent_inside_interval += 1;
+          return true;
       }
+      return false;
 
   }
 
@@ -306,21 +337,26 @@ contract DemandBid {
   //then multiply it with the betAmount
   function calculateRelativeBetAndCloseness() private {
       currentDay = (now - secondInit) / auctionLength;
-      uint difference_from_settlement_value;
-      if (round_info[currentDay--].settlement_value > agent_details[msg.sender][currentDay--].prediction) {
-          difference_from_settlement_value = round_info[currentDay--].settlement_value - agent_details[msg.sender][currentDay--].prediction;
-      } else {
-          difference_from_settlement_value = agent_details[msg.sender][currentDay--].prediction - round_info[currentDay--].settlement_value;
-      }
+      uint difference_from_settlement_value = differenceFromSettlementValue();
 
-      uint _relativeness = (1 / difference_from_settlement_value) * agent_details[msg.sender][currentDay--].betAmount;
+      uint _relativeness = (1 / difference_from_settlement_value) * agent_details[msg.sender][currentDay-2].betAmount;
 
       //maybe needs to have a parameter name relative
 
-      agent_details[msg.sender][currentDay--].relativeness = _relativeness;
-      round_info[currentDay--].sum_relativeness += _relativeness;
+      agent_details[msg.sender][currentDay-2].relativeness = _relativeness;
+      round_info[currentDay-2].sum_relativeness += _relativeness;
 
+  }
 
+  // find the difference between prediction and the actual settlement value
+  function differenceFromSettlementValue() private returns (uint) {
+      uint difference_from_settlement_value;
+      if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
+          difference_from_settlement_value = round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction;
+      } else {
+          difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
+      }
+      return difference_from_settlement_value;
   }
 
   //Can only calculate the reward on the day you withdraw
