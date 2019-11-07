@@ -51,6 +51,12 @@ contract DemandBid {
     event BetSubmission(address indexed accountAddress, uint prediction, uint dayNumber);
     // Calculate the shares that agent won
     event AuctionEnded(uint day_number, uint amount);
+    // Log when the hashes match and the prediction value
+    event predictionMatchesHash(uint prediction_value);
+    //
+    event keccak256Hash(bytes32 hashes);
+
+    event HashPrediction(bytes32 hash_prediction);
 
 
     //https://emn178.github.io/online-tools/keccak_256.html
@@ -85,6 +91,16 @@ contract DemandBid {
         //nextDay();
 
 
+    }
+
+    function getTodayHash() public returns (bytes32) {
+        currentDay = (now - secondInit) / auctionLength;
+        return agent_details[msg.sender][currentDay].hash_prediction;
+    }
+
+    function getYesterdayHash() public returns (bytes32) {
+        currentDay = (now - secondInit) / auctionLength;
+        return agent_details[msg.sender][currentDay--].hash_prediction;
     }
 
     //Only use for testing
@@ -166,20 +182,38 @@ contract DemandBid {
 
   //user needs to insert the length of their guess value that is inside the _predictionAndPassword
   //get the prediction by the first _guessLength in _predictionAndPassword
-  function revealBet(uint _guessLength, string memory _predictionAndPassword) public {
+  function revealBet(uint _guessLength, string memory _predictionAndPassword) public returns (bool) {
+
       currentDay = (now - secondInit) / auctionLength;
+
+      emit keccak256Hash(keccak256(_predictionAndPassword));
+      emit HashPrediction(agent_details[msg.sender][currentDay--].hash_prediction);
+
       //check if the keccak of the _predictionAndPassword is the same as the one inserted in submitBet
-      uint _prediction = hashSlicing(_guessLength, _predictionAndPassword);
-      agent_details[msg.sender][currentDay--].prediction = _prediction;
+      if (keccak256(_predictionAndPassword) == agent_details[msg.sender][currentDay--].hash_prediction) {
 
+        uint _prediction = hashSlicing(_guessLength, _predictionAndPassword);
 
-      //then compare keccak256(_predictionAndPassword) and the prediction (in hashes)
+        //set the real prediction value
+        agent_details[msg.sender][currentDay--].prediction = _prediction;
+
+        emit predictionMatchesHash(_prediction);
+        return true;
+
+      }
+
+      return false;
+
 
   }
 
+  /*function returnKeccak256(string) public pure returns (bytes32) {
+      return keccak256(string);
+  }*/
+
   //returns the prediction from the _predictionAndPassword string(bytes32)
   //by slicing the string using index
-  function hashSlicing(uint _index, string  _string) public pure returns (uint) {
+  function hashSlicing(uint _index, string  _string) private pure returns (uint) {
 
         //slice string
         bytes memory a = new bytes(_index);
@@ -192,7 +226,7 @@ contract DemandBid {
         return result;
   }
 
-  function getSlice(uint begin, uint end, string text) public pure returns (string) {
+  function getSlice(uint begin, uint end, string text) private pure returns (string) {
         bytes memory a = new bytes(end-begin+1);
         for(uint i=0;i<=end-begin;i++){
             a[i] = bytes(text)[i+begin-1];
@@ -201,7 +235,7 @@ contract DemandBid {
     }
 
   //convert string to uint
-  function stringToUint(string _s) public pure returns (uint result) {
+  function stringToUint(string _s) private pure returns (uint result) {
       bytes memory b = bytes(_s);
       result = 0;
       for (uint i = 0; i < b.length; i++) {
@@ -212,7 +246,7 @@ contract DemandBid {
       return result;
   }
 
-  function uintToString(uint v) public pure returns (string str) {
+  function uintToString(uint v) private pure returns (string str) {
         uint maxlength = 100;
         bytes memory reversed = new bytes(maxlength);
         uint i = 0;
