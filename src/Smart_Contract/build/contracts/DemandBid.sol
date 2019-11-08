@@ -1,14 +1,8 @@
 pragma solidity 0.4.26;
-//import "github.com/OpenZeppelin/zeppelin-solidity/contracts/math/SafeMath.sol";
-//import "github.com/Arachnid/solidity-stringutils/strings.sol";
-import "./DateTime.sol";
 
 contract DemandBid {
     //length of round (24 hours, 00:00 - 23:59:59:99)
     uint public auctionLength;
-
-    DateTime date = new DateTime();
-    //SafeMath safeMath = new SafeMath();
 
     //uint256 is the date
     mapping (address => mapping (uint => Bet_Info)) agent_details;
@@ -46,17 +40,15 @@ contract DemandBid {
         uint relativeness;
     }
 
-
-
     // Log the event about a bet submission being made by an address and its prediction
     event BetSubmission(address indexed accountAddress, uint prediction, uint dayNumber);
     // Calculate the shares that agent won
     event AuctionEnded(uint day_number, uint amount);
     // Log when the hashes match and the prediction value
     event predictionMatchesHash(uint prediction_value);
-    //
+    // Log when keccak256 is hashed
     event keccak256Hash(bytes32 hashes);
-
+    // Log when prediction hash is hashed
     event HashPrediction(bytes32 hash_prediction);
 
 
@@ -67,12 +59,11 @@ contract DemandBid {
 
         require (msg.value > 0, "The bet amount needs to be greater than 0");
 
-        //check if
+        //check if currentDay is today
         if (((now - secondInit) / auctionLength) != currentDay) {
 
               currentDay = (now - secondInit) / auctionLength;
               //calculate rewards for previous day
-
         }
 
         // take modulus to find the seconds left in today
@@ -92,9 +83,6 @@ contract DemandBid {
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
 
-        //for testing
-        //nextDay();
-
 
     }
 
@@ -106,13 +94,6 @@ contract DemandBid {
     function getYesterdayHash() public returns (bytes32) {
         currentDay = (now - secondInit) / auctionLength;
         return agent_details[msg.sender][currentDay--].hash_prediction;
-    }
-
-    //Only use for testing
-    function nextDay() public {
-        //add 86400sec to now - secondInit
-        currentDay = (now - secondInit + 1 days) / auctionLength;
-        setSettlementValue();
     }
 
     function getNow() public returns (uint) {
