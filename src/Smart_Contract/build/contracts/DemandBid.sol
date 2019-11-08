@@ -60,12 +60,12 @@ contract DemandBid {
     event HashPrediction(bytes32 hash_prediction);
 
 
-    //https://emn178.github.io/online-tools/keccak_256.html
-    //Agent needs to go to this website to hash the bet first
+    // https://emn178.github.io/online-tools/keccak_256.html
+    // Agent needs to go to this website to hash the bet first
+    // Bet can only be submitted from 00.00-23.00 of day0
     function submitBet(bytes32 _blindedBid) public payable {
 
         require (msg.value > 0, "The bet amount needs to be greater than 0");
-
 
         //check if
         if (((now - secondInit) / auctionLength) != currentDay) {
@@ -74,6 +74,10 @@ contract DemandBid {
               //calculate rewards for previous day
 
         }
+
+        // take modulus to find the seconds left in today
+        uint today_current_second = (now - secondInit) % auctionLength;
+        //require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
 
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
