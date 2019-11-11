@@ -1,6 +1,10 @@
-pragma solidity 0.4.26;
+pragma solidity 0.5.11;
 
 contract DemandBid {
+
+    //address of the owner of this contract
+    address owner;
+
     //length of round (24 hours, 00:00 - 23:59:59:99)
     uint public auctionLength;
 
@@ -15,6 +19,9 @@ contract DemandBid {
     constructor(uint _auctionLength) public {
         secondInit = now;
         auctionLength = _auctionLength;
+
+        //set owner of this contract ot be whi initialises this contract
+        owner = msg.sender;
     }
 
     struct Round {
@@ -182,54 +189,66 @@ contract DemandBid {
   // also calculate the highest and lowest interval
   // starting from day0, settlement_value is set on day2
   function setSettlementValue() public {
+
+      require (msg.sender == owner, "Only owner of the contract can call this function");
+
     // settlementValue = get_settlement_from_energy_supplier();
     currentDay = (now - secondInit) / auctionLength;
 
+
     require(currentDay > 1, "Cannot set settlement value yet");
+
+    //this function needs to be called by owner every midnight
 
     round_info[(currentDay-2)].settlement_value = 4200;
     round_info[(currentDay-2)].higherInterval = findHighestInterval();
     round_info[(currentDay-2)].lowerInterval = findLowestInterval();
   }
 
-  //user needs to insert the length of their guess value that is inside the _predictionAndPassword
-  //get the prediction by the first _guessLength in _predictionAndPassword
-  //revealBet is called on day 1;
-  function revealBet(uint _guessLength, string memory _predictionAndPassword) public returns (bool) {
-
+  // byte32 of prediction+password
+  // first 4 bytes limit to be for prediction, 28 bytes for password
+  function revealBet(uint index, bytes32  stringAndPassword) public returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
-      require(currentDay > 0, "Cannot reveal bet at this time");
 
-      emit keccak256Hash(keccak256(_predictionAndPassword));
-      emit HashPrediction(agent_details[msg.sender][currentDay--].hash_prediction);
+      //require (today_current_second >= (23 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
-      //check if the keccak of the _predictionAndPassword is the same as the one inserted in submitBet
-      if (keccak256(_predictionAndPassword) == agent_details[msg.sender][currentDay--].hash_prediction) {
+        //keccak256 the sring and password
 
-        uint _prediction = hashSlicing(_guessLength, _predictionAndPassword);
+        //convert stringAndPassword to bytes memory
+        bytes memory stringAndPassword_bytes = abi.encodePacked(stringAndPassword);
 
-        //set the real prediction value
-        agent_details[msg.sender][currentDay--].prediction = _prediction;
+        bytes32 hash = keccak256(stringAndPassword_bytes);
+        emit keccak256Hash(hash);
+        emit HashPrediction(agent_details[msg.sender][currentDay].hash_prediction);
 
-        emit predictionMatchesHash(_prediction);
-        agent_details[msg.sender][currentDay--].bet_hashes_correct = true;
-        return true;
+        //compare the hash with hash_prediction when submit bet
+        if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
+            uint _prediction = maskSlicing(index, stringAndPassword);
 
-      }
+            //set the real prediction value
+            agent_details[msg.sender][currentDay].prediction = _prediction;
 
-      agent_details[msg.sender][currentDay--].bet_hashes_correct = false;
+            emit predictionMatchesHash(_prediction);
 
-      return false;
+            agent_details[msg.sender][currentDay].bet_hashes_correct = true;
+
+        }
+
+        agent_details[msg.sender][currentDay--].bet_hashes_correct = false;
+
+        return false;
 
   }
 
-  /*function returnKeccak256(string) public pure returns (bytes32) {
-      return keccak256(string);
-  }*/
+  //needs to write new function for byte32 slicing (mask)
+  function maskSlicing(uint index, bytes32 stringAndPassword) private pure returns (uint) {
+      //mask
+  }
+
 
   //returns the prediction from the _predictionAndPassword string(bytes32)
   //by slicing the string using index
-  function hashSlicing(uint _index, string  _string) private pure returns (uint) {
+  /*function hashSlicing(uint _index, string  _string) private pure returns (uint) {
 
         //slice string
         bytes memory a = new bytes(_index);
@@ -240,18 +259,18 @@ contract DemandBid {
         //convert string to uint
         uint result = stringToUint(string(a));
         return result;
-  }
+  }*/
 
-  function getSlice(uint begin, uint end, string text) private pure returns (string) {
+  /*function getSlice(uint begin, uint end, string text) private pure returns (string) {
         bytes memory a = new bytes(end-begin+1);
         for(uint i=0;i<=end-begin;i++){
             a[i] = bytes(text)[i+begin-1];
         }
         return string(a);
-    }
+    }*/
 
   //convert string to uint
-  function stringToUint(string _s) private pure returns (uint result) {
+  /*function stringToUint(string _s) private pure returns (uint result) {
       bytes memory b = bytes(_s);
       result = 0;
       for (uint i = 0; i < b.length; i++) {
@@ -260,9 +279,9 @@ contract DemandBid {
           }
       }
       return result;
-  }
+  }*/
 
-  function uintToString(uint v) private pure returns (string str) {
+  /*function uintToString(uint v) private pure returns (string str) {
         uint maxlength = 100;
         bytes memory reversed = new bytes(maxlength);
         uint i = 0;
@@ -276,7 +295,7 @@ contract DemandBid {
             s[j] = reversed[i - j];
         }
         str = string(s);
-    }
+    }*/
 
   /*//Attach the string _predictionHash to the end of the prediction and see if it has the same
   function revealBet(uint _prediction, string memory _password) public {
