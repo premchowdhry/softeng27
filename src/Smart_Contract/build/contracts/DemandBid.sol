@@ -207,7 +207,7 @@ contract DemandBid {
 
   // byte32 of prediction+password
   // first 4 bytes limit to be for prediction, 28 bytes for password
-  function revealBet(uint index, bytes32  stringAndPassword) public returns (bool) {
+  function revealBet(bytes32  stringAndPassword) public returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
 
       //require (today_current_second >= (23 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
@@ -223,7 +223,7 @@ contract DemandBid {
 
         //compare the hash with hash_prediction when submit bet
         if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
-            uint _prediction = maskSlicing(index, stringAndPassword);
+            uint _prediction = getPredictionFromHash(stringAndPassword);
 
             //set the real prediction value
             agent_details[msg.sender][currentDay].prediction = _prediction;
@@ -240,62 +240,27 @@ contract DemandBid {
 
   }
 
-  //needs to write new function for byte32 slicing (mask)
-  function maskSlicing(uint index, bytes32 stringAndPassword) private pure returns (uint) {
+  // needs to write new function for byte32 slicing (mask)
+  // slice the first 4 bytes
+  // get first 32 bits
+  function getPredictionFromHash(bytes32 stringAndPassword) private pure returns (uint) {
       //mask
+      uint n = 32;
+      bytes32 nOnes = bytes32(2 ** n - 1);
+      bytes32 mask = shiftLeft(nOnes, 256 - n);
+      bytes32 prediction_in_bytes32 =  stringAndPassword & mask;
+      return uint(prediction_in_bytes32);
   }
 
+  function shiftLeft(bytes32 a, uint n) private pure returns (bytes32) {
+      uint shifted = uint(a) * 2 ** n;
+      return bytes32(shifted);
+  }
 
-  //returns the prediction from the _predictionAndPassword string(bytes32)
-  //by slicing the string using index
-  /*function hashSlicing(uint _index, string  _string) private pure returns (uint) {
+  // get the last 28 bytes
+  function getPasswordFromHash() private {
 
-        //slice string
-        bytes memory a = new bytes(_index);
-        for(uint i=0;i<=_index-1;i++){
-            a[i] = bytes(_string)[i];
-        }
-
-        //convert string to uint
-        uint result = stringToUint(string(a));
-        return result;
-  }*/
-
-  /*function getSlice(uint begin, uint end, string text) private pure returns (string) {
-        bytes memory a = new bytes(end-begin+1);
-        for(uint i=0;i<=end-begin;i++){
-            a[i] = bytes(text)[i+begin-1];
-        }
-        return string(a);
-    }*/
-
-  //convert string to uint
-  /*function stringToUint(string _s) private pure returns (uint result) {
-      bytes memory b = bytes(_s);
-      result = 0;
-      for (uint i = 0; i < b.length; i++) {
-          if (b[i] >= 48 && b[i] <= 57) {
-              result = result * 10 + (uint(b[i]) - 48);
-          }
-      }
-      return result;
-  }*/
-
-  /*function uintToString(uint v) private pure returns (string str) {
-        uint maxlength = 100;
-        bytes memory reversed = new bytes(maxlength);
-        uint i = 0;
-        while (v != 0) {
-            uint remainder = v % 10;
-            v = v / 10;
-            reversed[i++] = byte(48 + remainder);
-        }
-        bytes memory s = new bytes(i + 1);
-        for (uint j = 0; j <= i; j++) {
-            s[j] = reversed[i - j];
-        }
-        str = string(s);
-    }*/
+  }
 
   /*//Attach the string _predictionHash to the end of the prediction and see if it has the same
   function revealBet(uint _prediction, string memory _password) public {
