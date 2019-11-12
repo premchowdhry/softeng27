@@ -111,21 +111,7 @@ contract DemandBid {
     }
 
     //withdraw function can only be called on day2
-    function withdraw(uint _prediction) public {
-
-
-        currentDay = (now - secondInit) / auctionLength;
-
-        if (!agent_details[msg.sender][currentDay--].claimed) {
-            uint ytdReward = agent_details[msg.sender][currentDay--].reward;
-
-            (msg.sender).transfer((ytdReward));
-        }
-
-    }
-
-    //withdraw function can only be called on day2
-    function withdrawWithout() public {
+    function withdraw() public {
         currentDay = (now - secondInit) / auctionLength;
         require(currentDay > 1, "No available withdraws yet");
 
