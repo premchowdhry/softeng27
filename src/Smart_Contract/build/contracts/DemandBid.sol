@@ -115,6 +115,8 @@ contract DemandBid {
         currentDay = (now - secondInit) / auctionLength;
         require(currentDay > 1, "No available withdraws yet");
 
+        getReward();
+
         if (!agent_details[msg.sender][currentDay-2].claimed) {
             uint ytdReward = agent_details[msg.sender][currentDay--].reward;
 
@@ -170,7 +172,7 @@ contract DemandBid {
   // also calculate the highest and lowest interval
   // starting from day0, settlement_value is set on day2
   // owner of the contract can should call this at midnight of day1
-  function setSettlementValue() public {
+  function setSettlementValue(uint value) public {
 
       require (msg.sender == owner, "Only owner of the contract can call this function");
 
@@ -182,7 +184,7 @@ contract DemandBid {
 
     //this function needs to be called by owner every midnight
 
-    round_info[(currentDay-2)].settlement_value = 4200;
+    round_info[(currentDay-2)].settlement_value = value;
     round_info[(currentDay-2)].higherInterval = findHighestInterval();
     round_info[(currentDay-2)].lowerInterval = findLowestInterval();
     round_info[(currentDay-2)].settlement_is_set = true;
@@ -280,6 +282,8 @@ contract DemandBid {
   }
 
   // find the difference between prediction and the actual settlement value
+  // needs to check for 0 (exact number for guess and settlement_value)
+  // if exactly then make equal to 1
   function differenceFromSettlementValue() private returns (uint) {
 
       currentDay = (now - secondInit) / auctionLength;
@@ -287,7 +291,10 @@ contract DemandBid {
       require (currentDay > 1);
 
       uint difference_from_settlement_value;
-      if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
+
+      if (round_info[currentDay-2].settlement_value == agent_details[msg.sender][currentDay-2].prediction) {
+          difference_from_settlement_value = 1;
+      } else if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
           difference_from_settlement_value = round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction;
       } else {
           difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
@@ -295,7 +302,8 @@ contract DemandBid {
       return difference_from_settlement_value;
   }
 
-  //Can only calculate the reward on the day you withdraw
+  // Can only calculate the reward on the day you withdraw
+  // call in withdraw
   function getReward() private {
       currentDay = (now - secondInit) / auctionLength;
 
@@ -312,13 +320,15 @@ contract DemandBid {
       if (checkIfInsideInterval()) {
           //calculate parameter for relativeness and sum_relativeness
           calculateRelativeBetAndCloseness();
-          getReward();
+
 
       } else {
           //if not inside the interval then agent do not get a reward
           agent_details[msg.sender][currentDay-2].reward = 0;
       }
   }
+
+
 
 
 }
