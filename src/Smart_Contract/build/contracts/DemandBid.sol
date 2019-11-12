@@ -86,6 +86,8 @@ contract DemandBid {
         agent_details[msg.sender][currentDay].reward = msg.value;
 
         agent_details[msg.sender][currentDay].claimed = false;
+
+        //increment total_pot with the bet amount
         round_info[currentDay].total_pot += msg.value;
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
@@ -111,28 +113,6 @@ contract DemandBid {
     //withdraw function can only be called on day2
     function withdraw(uint _prediction) public {
 
-        //uint total_sum = 0;
-        // currentDay = (now - secondInit) / auctionLength;
-        // for (uint i = currentDay; i >= 0; i--) {
-        //     if (!agent_details[msg.sender][i].claimed) {
-        //         (msg.sender).transfer(agent_details[msg.sender][i].reward);
-        //     } else {
-        //         /*if (agent_details[msg.sender][i].bet_hashes_correct) {
-
-        //         }*/
-        //         //total_sum =  SafeMath.add(agent_details[msg.sender][i].reward, total_sum);
-        //         //agent_details[msg.sender][i].claimed = true;
-
-        //         break;
-        //     }
-        // }
-
-        /*if (total_sum >= 0) {
-            (msg.sender).transfer(1 ether);
-        }*/
-
-
-        //(msg.sender).transfer(1 ether);
 
         currentDay = (now - secondInit) / auctionLength;
 
@@ -144,24 +124,39 @@ contract DemandBid {
 
     }
 
+    //withdraw function can only be called on day2
     function withdrawWithout() public {
         currentDay = (now - secondInit) / auctionLength;
         require(currentDay > 1, "No available withdraws yet");
 
-        //check whether the settlement_value for the day has been set
-        //if the settlement value has not been set = it has been call the first time for that day
-        if (!round_info[currentDay-2].settlement_is_set) {
+        if (!agent_details[msg.sender][currentDay-2].claimed) {
+            uint ytdReward = agent_details[msg.sender][currentDay--].reward;
 
-            setSettlementValue();
-            round_info[currentDay-2].settlement_is_set = true;
+            // only needs to transfer the funds if reward > 0
+            if (ytdReward > 0) {
+                //transfer rewards to the agent
+            (msg.sender).transfer((ytdReward));
+
+            //deduct the withdraw amount from today's total_pot
+            round_info[currentDay-2].total_pot -= ytdReward;
+            }
+
         }
 
-        //then just need to compare the bet with the intervals
-        if (checkIfInsideInterval()) {
-            //create a sorted list for storing the closest bet to the actual settlement value
+    }
 
+    // call this function if there is leftover total_pot from yesterday's
+    // can call this function first after settlement_value for today is called
+    function updateTotalPotFor2DaysAgoRound() public {
+        currentDay = (now - secondInit) / auctionLength;
+        require(currentDay > 2, "Can only update after day2");
+
+        // only needs to update the pot if there is leftover
+        if (round_info[currentDay-3].total_pot > 0) {
+
+            // update total_pot with leftover
+            round_info[currentDay-2].total_pot += round_info[currentDay-3].total_pot;
         }
-
     }
 
     // return the rewardAmount of the msg.sender on the day specify
@@ -188,6 +183,7 @@ contract DemandBid {
   // get settlementValue from energy supplier and set the settlement Value
   // also calculate the highest and lowest interval
   // starting from day0, settlement_value is set on day2
+  // owner of the contract can should call this at midnight of day1
   function setSettlementValue() public {
 
       require (msg.sender == owner, "Only owner of the contract can call this function");
@@ -203,6 +199,7 @@ contract DemandBid {
     round_info[(currentDay-2)].settlement_value = 4200;
     round_info[(currentDay-2)].higherInterval = findHighestInterval();
     round_info[(currentDay-2)].lowerInterval = findLowestInterval();
+    round_info[(currentDay-2)].settlement_is_set = true;
   }
 
   // byte32 of prediction+password
@@ -252,6 +249,7 @@ contract DemandBid {
       return uint(prediction_in_bytes32);
   }
 
+  // shift bytes by 32 bits
   function shiftLeft(bytes32 a, uint n) private pure returns (bytes32) {
       uint shifted = uint(a) * 2 ** n;
       return bytes32(shifted);
@@ -262,35 +260,11 @@ contract DemandBid {
 
   }
 
-  /*//Attach the string _predictionHash to the end of the prediction and see if it has the same
-  function revealBet(uint _prediction, string memory _password) public {
-
-      require (now / auctionLength != currentDay);
-
-      //check whether the hash prediction inserted when the bet submitted is the same
-      //as the string concat of prediction + predictionHash
-      //e.g. 4200Hello123
-
-      string memory predictionStr;
-
-      string hashStr;  = predictionStr.toSlice().concat(_password.toSlice());
-
-      if (agent_details[msg.sender][currentDay--].hash_prediction == keccak256(hashStr)) {
-          agent_details[msg.sender][currentDay--].prediction = _prediction;
-          agent_details[msg.sender][currentDay--].bet_hashes_correct = true;
-
-      } else {
-          //if the hashes do not match then set the agent prediction to equal to 0 instead
-          agent_details[msg.sender][currentDay--].prediction = 0;
-          agent_details[msg.sender][currentDay--].bet_hashes_correct = false;
-      }
-
-  }*/
-
   //need sorted list for how close the
-  //?? call this function when calling withdraw function ??
   function checkIfInsideInterval() private returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
+      require (currentDay > 1);
+
       if (agent_details[msg.sender][currentDay-2].prediction <= round_info[currentDay-2].higherInterval &&
       agent_details[msg.sender][currentDay-2].prediction >= round_info[currentDay-2].lowerInterval) {
           agent_details[msg.sender][currentDay-2].insideInterval = true;
@@ -306,6 +280,8 @@ contract DemandBid {
   //then multiply it with the betAmount
   function calculateRelativeBetAndCloseness() private {
       currentDay = (now - secondInit) / auctionLength;
+      require (currentDay > 1);
+
       uint difference_from_settlement_value = differenceFromSettlementValue();
 
       uint _relativeness = (1 / difference_from_settlement_value) * agent_details[msg.sender][currentDay-2].betAmount;
@@ -319,6 +295,11 @@ contract DemandBid {
 
   // find the difference between prediction and the actual settlement value
   function differenceFromSettlementValue() private returns (uint) {
+
+      currentDay = (now - secondInit) / auctionLength;
+
+      require (currentDay > 1);
+
       uint difference_from_settlement_value;
       if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
           difference_from_settlement_value = round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction;
@@ -329,10 +310,28 @@ contract DemandBid {
   }
 
   //Can only calculate the reward on the day you withdraw
-  function calculateReward() private {
+  function getReward() private {
       currentDay = (now - secondInit) / auctionLength;
+
       uint _reward = (agent_details[msg.sender][currentDay-2].relativeness / round_info[currentDay-2].sum_relativeness) * round_info[currentDay-2].total_pot;
       agent_details[msg.sender][currentDay-2].reward = _reward;
+  }
+
+  // calculate rewards should be called after settlement_value is set after midnight
+  // this should be called asap
+  function calculateReward() public {
+      currentDay = (now - secondInit) / auctionLength;
+
+      // checkIfInsideInterval
+      if (checkIfInsideInterval()) {
+          //calculate parameter for relativeness and sum_relativeness
+          calculateRelativeBetAndCloseness();
+          getReward();
+
+      } else {
+          //if not inside the interval then agent do not get a reward
+          agent_details[msg.sender][currentDay-2].reward = 0;
+      }
   }
 
 
