@@ -57,6 +57,10 @@ contract DemandBid {
     event keccak256Hash(bytes32 hashes);
     // Log when prediction hash is hashed
     event HashPrediction(bytes32 hash_prediction);
+    // Log when prediction is get from the hash
+    event GetPrediction(uint prediction);
+    // Log when prediction_in_bytes32
+    event PredictionInBytes32(bytes32 prediction);
 
 
     // https://emn178.github.io/online-tools/keccak_256.html
@@ -77,10 +81,14 @@ contract DemandBid {
         uint today_current_second = (now - secondInit) % auctionLength;
         //require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
 
+        bytes memory stringAndPassword_bytes = abi.encodePacked(_blindedBid);
+
+        bytes32 hash = keccak256(stringAndPassword_bytes);
+        emit keccak256Hash(hash);
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
         //agent_details[msg.sender][currentDay].prediction = _prediction;
-        agent_details[msg.sender][currentDay].hash_prediction = _blindedBid;
+        agent_details[msg.sender][currentDay].hash_prediction = hash;
 
         // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
         agent_details[msg.sender][currentDay].reward = msg.value;
@@ -217,24 +225,34 @@ contract DemandBid {
 
             agent_details[msg.sender][currentDay].bet_hashes_correct = true;
 
+            return true;
+
+        } else {
+            agent_details[msg.sender][currentDay].bet_hashes_correct = false;
+
+            return false;
         }
 
-        agent_details[msg.sender][currentDay--].bet_hashes_correct = false;
 
-        return false;
 
   }
 
   // needs to write new function for byte32 slicing (mask)
   // slice the first 4 bytes
   // get first 32 bits
-  function getPredictionFromHash(bytes32 stringAndPassword) private pure returns (uint) {
-      //mask
+  function getPredictionFromHash(bytes32 stringAndPassword) public returns (uint) {
+      // mask
       uint n = 32;
       bytes32 nOnes = bytes32(2 ** n - 1);
       bytes32 mask = shiftLeft(nOnes, 256 - n);
       bytes32 prediction_in_bytes32 =  stringAndPassword & mask;
-      return uint(prediction_in_bytes32);
+      // print 4 bytes that is extracted
+      emit PredictionInBytes32(prediction_in_bytes32);
+      // shift right by 28 bytes (224 bits)
+      bytes32 prediction_shifted_right = shiftRight(prediction_in_bytes32, 224);
+      emit PredictionInBytes32(prediction_shifted_right);
+
+      return uint(prediction_shifted_right);
   }
 
   // shift bytes by 32 bits
@@ -242,6 +260,24 @@ contract DemandBid {
       uint shifted = uint(a) * 2 ** n;
       return bytes32(shifted);
   }
+
+  function getFirstNBytes(bytes1 x, uint8 n) public pure returns (bytes1) {
+      require ( (2 ** n) < 255);
+      bytes1 nOnes = bytes1(2 ** (n - 1));
+      bytes1 mask = nOnes >> (8 - n);
+      return x & mask;
+  }
+
+  function shiftRight(bytes32 a, uint n) private pure returns (bytes32) {
+      return bytes32(uint(a) / 2 ** n);
+  }
+
+  /*function getFirstNBytes(bytes1 _x, uint8 _n) public pure returns (bytes1) {
+    //require (2 ** _n < 255, “Overflow");
+    bytes1 nOnes = bytes1(2 ** _n — 1);
+    bytes1 mask = nOnes >> (8 — _n); // Total 8 bits
+    return _x & mask;
+}*/
 
   // get the last 28 bytes
   function getPasswordFromHash() private {
