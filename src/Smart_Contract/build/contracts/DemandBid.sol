@@ -108,14 +108,15 @@ contract DemandBid {
         return agent_details[msg.sender][currentDay].hash_prediction;
     }
 
-    function getYesterdayHash() public returns (bytes32) {
+    function getYesterdayHash() public  returns (bytes32) {
         currentDay = (now - secondInit) / auctionLength;
         return agent_details[msg.sender][currentDay--].hash_prediction;
     }
 
-    function getNow() public returns (uint) {
+    function getNow() public view returns (uint) {
         uint x = now;
-        return x;
+        //return how many seconds have past
+        return x - secondInit;
     }
 
     //withdraw function can only be called on day2
@@ -143,7 +144,9 @@ contract DemandBid {
 
     // call this function if there is leftover total_pot from yesterday's
     // can call this function first after settlement_value for today is called
+    // owner should be the one to call it????
     function updateTotalPotFor2DaysAgoRound() public {
+        require (msg.sender == owner, "Only owener of the contract should cal this function!");
         currentDay = (now - secondInit) / auctionLength;
         require(currentDay > 2, "Can only update after day2");
 
