@@ -2,25 +2,27 @@ pragma solidity 0.5.11;
 
 contract DemandBid {
 
-    //address of the owner of this contract
+    // address of the owner of this contract
     address owner;
 
-    //length of round (24 hours, 00:00 - 23:59:59:99)
+    // length of round (24 hours, 00:00 - 23:59:59:99)
     uint public auctionLength;
 
-    //uint256 is the date
+    // uint256 is the date
     mapping (address => mapping (uint => Bet_Info)) agent_details;
     mapping (uint => Round) round_info;
 
-    //initialises day = 0
+    // initialises day = 0
     uint currentDay = 0;
+
+    // seconds when initialise the contract
     uint secondInit;
 
     constructor(uint _auctionLength) public {
         secondInit = now;
         auctionLength = _auctionLength;
 
-        //set owner of this contract ot be whi initialises this contract
+        // set owner of this contract ot be whi initialises this contract
         owner = msg.sender;
     }
 
@@ -61,6 +63,8 @@ contract DemandBid {
     event GetPrediction(uint prediction);
     // Log when prediction_in_bytes32
     event PredictionInBytes32(bytes32 prediction);
+    // Log when address has nothing to withdraw (prediction not inside interval)
+    event PredictionNotInsideInterval(string str);
 
 
     // https://emn178.github.io/online-tools/keccak_256.html
@@ -70,16 +74,16 @@ contract DemandBid {
 
         require (msg.value > 0, "The bet amount needs to be greater than 0");
 
-        //check if currentDay is today
+        // check if currentDay is today
         if (((now - secondInit) / auctionLength) != currentDay) {
 
               currentDay = (now - secondInit) / auctionLength;
-              //calculate rewards for previous day
+              // calculate rewards for previous day
         }
 
         // take modulus to find the seconds left in today
         uint today_current_second = (now - secondInit) % auctionLength;
-        //require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
+        // require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
 
         bytes memory stringAndPassword_bytes = abi.encodePacked(_blindedBid);
 
@@ -87,7 +91,7 @@ contract DemandBid {
         emit keccak256Hash(hash);
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
-        //agent_details[msg.sender][currentDay].prediction = _prediction;
+        // agent_details[msg.sender][currentDay].prediction = _prediction;
         agent_details[msg.sender][currentDay].hash_prediction = hash;
 
         // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
@@ -95,12 +99,10 @@ contract DemandBid {
 
         agent_details[msg.sender][currentDay].claimed = false;
 
-        //increment total_pot with the bet amount
+        // increment total_pot with the bet amount
         round_info[currentDay].total_pot += msg.value;
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
-
-
     }
 
     function getTodayHash() public returns (bytes32) {
@@ -115,36 +117,50 @@ contract DemandBid {
 
     function getNow() public view returns (uint) {
         uint x = now;
-        //return how many seconds have past
+        // return how many seconds have past
         return x - secondInit;
     }
 
-    //withdraw function can only be called on day2
+    // withdraw function can only be called on day2
+    // can only call withdraw after
     function withdraw() public {
         currentDay = (now - secondInit) / auctionLength;
         require(currentDay > 1, "No available withdraws yet");
+        //require(, "Can only claimed rewards for today");
 
-        getReward();
+        // Check whether it has past 3am
+        uint today_current_second = (now - secondInit) % auctionLength;
+        // require(today_current_second >= (3 / 24) * auctionLength && today_current_second <= auctionLength, "Can only called withdraw after 3a.m.");
 
-        if (!agent_details[msg.sender][currentDay-2].claimed) {
-            uint ytdReward = agent_details[msg.sender][currentDay--].reward;
+        if (agent_details[msg.sender][currentDay-2].insideInterval) {
 
-            // only needs to transfer the funds if reward > 0
-            if (ytdReward > 0) {
-                //transfer rewards to the agent
-            (msg.sender).transfer((ytdReward));
+            // call getReward() to calculate what reward this address can claimed
+            // can only be called after all agents called calculateReward()
+            // only needs to call getReward() if it is inside interval
+            getReward();
 
-            //deduct the withdraw amount from today's total_pot
-            round_info[currentDay-2].total_pot -= ytdReward;
+            if (!agent_details[msg.sender][currentDay-2].claimed) {
+                uint ytdReward = agent_details[msg.sender][currentDay--].reward;
+
+                // only needs to transfer the funds if reward > 0
+                if (ytdReward > 0) {
+                // transfer rewards to the agent
+                (msg.sender).transfer((ytdReward));
+
+                // deduct the withdraw amount from today's total_pot
+                round_info[currentDay-2].total_pot -= ytdReward;
+                }
             }
-
+        }  else {
+            //
+            emit PredictionNotInsideInterval("Your prediction are not close to the settlement value so you do not win any prize.");
         }
 
     }
 
     // call this function if there is leftover total_pot from yesterday's
     // can call this function first after settlement_value for today is called
-    // owner should be the one to call it????
+    // owner should be the one to call it
     function updateTotalPotFor2DaysAgoRound() public {
         require (msg.sender == owner, "Only owener of the contract should cal this function!");
         currentDay = (now - secondInit) / auctionLength;
@@ -159,7 +175,9 @@ contract DemandBid {
     }
 
     // return the rewardAmount of the msg.sender on the day specify
+    // only call this function after calculate reward is already called
     function getRewardAmount(uint day) public view returns (uint) {
+        require (day > 0, "Day < 0 does not exist");
         return agent_details[msg.sender][day].reward;
     }
 
@@ -190,7 +208,6 @@ contract DemandBid {
     // settlementValue = get_settlement_from_energy_supplier();
     currentDay = (now - secondInit) / auctionLength;
 
-
     require(currentDay > 1, "Cannot set settlement value yet");
 
     //this function needs to be called by owner every midnight
@@ -203,15 +220,16 @@ contract DemandBid {
 
   // byte32 of prediction+password
   // first 4 bytes limit to be for prediction, 28 bytes for password
-  function revealBet(bytes32  stringAndPassword) public returns (bool) {
+  function revealBet(bytes32  predictionAndPassword) public returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
 
-      //require (today_current_second >= (23 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
+      uint today_current_second = (now - secondInit) % auctionLength;
+      //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
         //keccak256 the sring and password
 
         //convert stringAndPassword to bytes memory
-        bytes memory stringAndPassword_bytes = abi.encodePacked(stringAndPassword);
+        bytes memory stringAndPassword_bytes = abi.encodePacked(predictionAndPassword);
 
         bytes32 hash = keccak256(stringAndPassword_bytes);
         emit keccak256Hash(hash);
@@ -219,7 +237,7 @@ contract DemandBid {
 
         //compare the hash with hash_prediction when submit bet
         if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
-            uint _prediction = getPredictionFromHash(stringAndPassword);
+            uint _prediction = getPredictionFromHash(predictionAndPassword);
 
             //set the real prediction value
             agent_details[msg.sender][currentDay].prediction = _prediction;
@@ -235,8 +253,6 @@ contract DemandBid {
 
             return false;
         }
-
-
 
   }
 
@@ -274,13 +290,6 @@ contract DemandBid {
   function shiftRight(bytes32 a, uint n) private pure returns (bytes32) {
       return bytes32(uint(a) / 2 ** n);
   }
-
-  /*function getFirstNBytes(bytes1 _x, uint8 _n) public pure returns (bytes1) {
-    //require (2 ** _n < 255, “Overflow");
-    bytes1 nOnes = bytes1(2 ** _n — 1);
-    bytes1 mask = nOnes >> (8 — _n); // Total 8 bits
-    return _x & mask;
-}*/
 
   // get the last 28 bytes
   function getPasswordFromHash() private {
@@ -331,6 +340,7 @@ contract DemandBid {
 
       uint difference_from_settlement_value;
 
+      //check if they are equal, if yes then return 1
       if (round_info[currentDay-2].settlement_value == agent_details[msg.sender][currentDay-2].prediction) {
           difference_from_settlement_value = 1;
       } else if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
@@ -366,8 +376,5 @@ contract DemandBid {
           agent_details[msg.sender][currentDay-2].reward = 0;
       }
   }
-
-
-
 
 }
