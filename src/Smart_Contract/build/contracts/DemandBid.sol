@@ -85,14 +85,14 @@ contract DemandBid {
         uint today_current_second = (now - secondInit) % auctionLength;
         // require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
 
-        bytes memory stringAndPassword_bytes = abi.encodePacked(_blindedBid);
+        /*bytes memory stringAndPassword_bytes = abi.encodePacked(_blindedBid);
 
         bytes32 hash = keccak256(stringAndPassword_bytes);
-        emit keccak256Hash(hash);
+        emit keccak256Hash(hash);*/
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
         // agent_details[msg.sender][currentDay].prediction = _prediction;
-        agent_details[msg.sender][currentDay].hash_prediction = hash;
+        agent_details[msg.sender][currentDay].hash_prediction = _blindedBid;
 
         // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
         agent_details[msg.sender][currentDay].reward = msg.value;
@@ -218,6 +218,44 @@ contract DemandBid {
     round_info[(currentDay-2)].settlement_is_set = true;
   }
 
+  function returnABIEncodePacked(uint prediction, string memory password) public pure returns (bytes memory) {
+      return abi.encodePacked(prediction, password);
+  }
+
+  function returnKeccak256(bytes memory hash) public pure returns (bytes32) {
+      return keccak256(hash);
+  }
+
+  /// Place a blinded bid with `_blindedBid` =
+    /// keccak256(abi.encodePacked(value, fake, secret)).
+  function revealBet(uint prediction, string memory password) public returns (bool) {
+      currentDay = (now - secondInit) / auctionLength;
+
+      uint today_current_second = (now - secondInit) % auctionLength;
+      //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
+
+      bytes32 hash = keccak256(abi.encodePacked(prediction, password));
+      emit keccak256Hash(hash);
+
+      if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
+
+            //set the real prediction value
+            agent_details[msg.sender][currentDay].prediction = prediction;
+
+            emit predictionMatchesHash(prediction);
+
+            agent_details[msg.sender][currentDay].bet_hashes_correct = true;
+
+            return true;
+
+        } else {
+            agent_details[msg.sender][currentDay].bet_hashes_correct = false;
+
+            return false;
+        }
+
+  }
+  /*
   // byte32 of prediction+password
   // first 4 bytes limit to be for prediction, 28 bytes for password
   function revealBet(bytes32  predictionAndPassword) public returns (bool) {
@@ -229,14 +267,30 @@ contract DemandBid {
         //keccak256 the sring and password
 
         //convert stringAndPassword to bytes memory
-        bytes memory stringAndPassword_bytes = abi.encodePacked(predictionAndPassword);
+        //bytes memory stringAndPassword_bytes = abi.encodePacked(predictionAndPassword);
 
-        bytes32 hash = keccak256(stringAndPassword_bytes);
-        emit keccak256Hash(hash);
+        //bytes32 hash = keccak256(bytes(stringAndPassword_bytes));
+        //emit keccak256Hash(abi.encodePacked(prediction, stringAndPassword));
+        //bytes32 hashes = keccak256(abi.encodePacked(prediction, stringAndPassword));
+
+        //bytes32 hashes = keccak256(abi.encodePacked(bytes32ToStr(predictionAndPassword)));
+        //emit keccak256Hash(hash);
+
+        //bytes32 hash = keccak256((stringPredictionAndPassword));
+
+        //convert bytes32 to string
+        //bytes memory hash_predicition_bytes = abi.encodePacked(agent_details[msg.sender][currentDay].hash_prediction);
+        //bytes32 hash_of_hash_prediction = keccak256(hash_predicition_bytes);
+
+        emit keccak256Hash(hashes);
         emit HashPrediction(agent_details[msg.sender][currentDay].hash_prediction);
+        //emit HashPrediction(hash_of_hash_prediction);
 
         //compare the hash with hash_prediction when submit bet
-        if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
+        if (hashes == agent_details[msg.sender][currentDay].hash_prediction) {
+
+        //trying a sneakey way
+        //if (hash == hash_of_hash_prediction) {
             uint _prediction = getPredictionFromHash(predictionAndPassword);
 
             //set the real prediction value
@@ -254,7 +308,7 @@ contract DemandBid {
             return false;
         }
 
-  }
+  }*/
 
   // needs to write new function for byte32 slicing (mask)
   // slice the first 4 bytes
@@ -376,5 +430,38 @@ contract DemandBid {
           agent_details[msg.sender][currentDay-2].reward = 0;
       }
   }
+    function bytes32ToStr(bytes32 _bytes32) public pure returns (string memory) {
+
+        // string memory str = string(_bytes32);
+        // TypeError: Explicit type conversion not allowed from "bytes32" to "string storage pointer"
+        // thus we should fist convert bytes32 to bytes (to dynamically-sized byte array)
+
+        bytes memory bytesArray = new bytes(32);
+        for (uint i; i < 32; i++) {
+            bytesArray[i] = _bytes32[i];
+            //emit
+        }
+        return string(bytesArray);
+
+    }
+
+    function bytes32ToString(bytes32 x) public pure returns (string memory) {
+    bytes memory bytesString = new bytes(32);
+    uint charCount = 0;
+    for (uint j = 0; j < 32; j++) {
+        byte char = byte(bytes32(uint(x) * 2 ** (8 * j)));
+        if (char != 0) {
+            bytesString[charCount] = char;
+            charCount++;
+        }
+    }
+    bytes memory bytesStringTrimmed = new bytes(charCount);
+    for (uint j = 0; j < charCount; j++) {
+        bytesStringTrimmed[j] = bytesString[j];
+    }
+    return string(bytesStringTrimmed);
+    }
+
+
 
 }
