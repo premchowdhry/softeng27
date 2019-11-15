@@ -65,6 +65,8 @@ contract DemandBid {
     event PredictionInBytes32(bytes32 prediction);
     // Log when address has nothing to withdraw (prediction not inside interval)
     event PredictionNotInsideInterval(string str);
+    // Log for printing when debugging
+    event Print(string str);
 
 
     // https://emn178.github.io/online-tools/keccak_256.html
@@ -83,7 +85,7 @@ contract DemandBid {
 
         // take modulus to find the seconds left in today
         uint today_current_second = (now - secondInit) % auctionLength;
-        // require (today_current_second <= (23 / 24) * auctionLength, "Only accept bet before 23.00.00");
+        require (today_current_second <= 23 * auctionLength / 24, "Only accept bet before 23.00.00");
 
         /*bytes memory stringAndPassword_bytes = abi.encodePacked(_blindedBid);
 
@@ -91,7 +93,8 @@ contract DemandBid {
         emit keccak256Hash(hash);*/
 
         agent_details[msg.sender][currentDay].betAmount = msg.value;
-        // agent_details[msg.sender][currentDay].prediction = _prediction;
+
+        //set hash_prediction = _blindedBid (arguments when this function is called)
         agent_details[msg.sender][currentDay].hash_prediction = _blindedBid;
 
         // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
@@ -121,7 +124,13 @@ contract DemandBid {
         return x - secondInit;
     }
 
-    // withdraw function can only be called on day2
+    function getTodayCurrentSeconds() public view returns (uint) {
+        // take modulus to find the seconds left in today
+        uint today_current_second = (now - secondInit) % auctionLength;
+        return today_current_second;
+    }
+
+    // withdraw function can only be called after 3a.m. on day2
     // can only call withdraw after
     function withdraw() public {
         currentDay = (now - secondInit) / auctionLength;
@@ -130,7 +139,7 @@ contract DemandBid {
 
         // Check whether it has past 3am
         uint today_current_second = (now - secondInit) % auctionLength;
-        // require(today_current_second >= (3 / 24) * auctionLength && today_current_second <= auctionLength, "Can only called withdraw after 3a.m.");
+        require(today_current_second >= 3 * auctionLength / 24 && today_current_second <= auctionLength, "Can only called withdraw after 3a.m.");
 
         if (agent_details[msg.sender][currentDay-2].insideInterval) {
 
@@ -140,6 +149,7 @@ contract DemandBid {
             getReward();
 
             if (!agent_details[msg.sender][currentDay-2].claimed) {
+                //get reward of the reward that can be withdraw
                 uint ytdReward = agent_details[msg.sender][currentDay--].reward;
 
                 // only needs to transfer the funds if reward > 0
@@ -203,14 +213,14 @@ contract DemandBid {
   // owner of the contract can should call this at midnight of day1
   function setSettlementValue(uint value) public {
 
-      require (msg.sender == owner, "Only owner of the contract can call this function");
+     require (msg.sender == owner, "Only owner of the contract can call this function");
 
-    // settlementValue = get_settlement_from_energy_supplier();
+     // settlementValue = get_settlement_from_energy_supplier();
     currentDay = (now - secondInit) / auctionLength;
 
     require(currentDay > 1, "Cannot set settlement value yet");
 
-    //this function needs to be called by owner every midnight
+    // this function needs to be called by owner every midnight
 
     round_info[(currentDay-2)].settlement_value = value;
     round_info[(currentDay-2)].higherInterval = findHighestInterval();
@@ -218,21 +228,21 @@ contract DemandBid {
     round_info[(currentDay-2)].settlement_is_set = true;
   }
 
-  function returnABIEncodePacked(uint prediction, string memory password) public pure returns (bytes memory) {
+    function returnABIEncodePacked(uint prediction, string memory password) public pure returns (bytes memory) {
       return abi.encodePacked(prediction, password);
-  }
+    }
 
-  function returnKeccak256(bytes memory hash) public pure returns (bytes32) {
+    function returnKeccak256(bytes memory hash) public pure returns (bytes32) {
       return keccak256(hash);
-  }
+    }
 
-  /// Place a blinded bid with `_blindedBid` =
-    /// keccak256(abi.encodePacked(value, fake, secret)).
-  function revealBet(uint prediction, string memory password) public returns (bool) {
+    // Place a blinded bid with `_blindedBid` =
+    // keccak256(abi.encodePacked(prediction, password)).
+    function revealBet(uint prediction, string memory password) public returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
 
       uint today_current_second = (now - secondInit) % auctionLength;
-      //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
+      require (today_current_second >= 23 * auctionLength / 24 && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
       bytes32 hash = keccak256(abi.encodePacked(prediction, password));
       emit keccak256Hash(hash);
@@ -244,25 +254,25 @@ contract DemandBid {
 
             emit predictionMatchesHash(prediction);
 
+            //set bet_hashes_correct = true;
             agent_details[msg.sender][currentDay].bet_hashes_correct = true;
-
             return true;
 
         } else {
             agent_details[msg.sender][currentDay].bet_hashes_correct = false;
-
             return false;
         }
 
   }
-  /*
-  // byte32 of prediction+password
-  // first 4 bytes limit to be for prediction, 28 bytes for password
-  function revealBet(bytes32  predictionAndPassword) public returns (bool) {
-      currentDay = (now - secondInit) / auctionLength;
 
-      uint today_current_second = (now - secondInit) % auctionLength;
-      //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
+    /*
+    // byte32 of prediction+password
+    // first 4 bytes limit to be for prediction, 28 bytes for password
+    function revealBet(bytes32  predictionAndPassword) public returns (bool) {
+        currentDay = (now - secondInit) / auctionLength;
+
+        uint today_current_second = (now - secondInit) % auctionLength;
+        //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
         //keccak256 the sring and password
 
@@ -345,12 +355,8 @@ contract DemandBid {
       return bytes32(uint(a) / 2 ** n);
   }
 
-  // get the last 28 bytes
-  function getPasswordFromHash() private {
 
-  }
-
-  //need sorted list for how close the
+  // check whether the prediction is inside today's interval
   function checkIfInsideInterval() private returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
       require (currentDay > 1);
@@ -365,9 +371,9 @@ contract DemandBid {
 
   }
 
-  //calculate the relativeness value and set the relativeness in the struct at the end
-  //calculate by the inverse of the differences between the settlement_value and the guess
-  //then multiply it with the betAmount
+  // calculate the relativeness value and set the relativeness in the struct at the end
+  // calculate by the inverse of the differences between the settlement_value and the guess
+  // then multiply it with the betAmount
   function calculateRelativeBetAndCloseness() private {
       currentDay = (now - secondInit) / auctionLength;
       require (currentDay > 1);
@@ -407,6 +413,7 @@ contract DemandBid {
 
   // Can only calculate the reward on the day you withdraw
   // call in withdraw
+  // only allow to withdraw after 3a.m. on day2
   function getReward() private {
       currentDay = (now - secondInit) / auctionLength;
 
@@ -414,20 +421,28 @@ contract DemandBid {
       agent_details[msg.sender][currentDay-2].reward = _reward;
   }
 
-  // calculate rewards should be called after settlement_value is set after midnight
-  // this should be called asap
-  function calculateReward() public {
-      currentDay = (now - secondInit) / auctionLength;
+    // calculate rewards should be called after settlement_value is set after midnight
+    // this should be called asap
+    // only allow to calculate reward  from midnight to 3a.m. on day2
+    function calculateReward() public {
+        currentDay = (now - secondInit) / auctionLength;
 
-      // checkIfInsideInterval
-      if (checkIfInsideInterval()) {
-          //calculate parameter for relativeness and sum_relativeness
-          calculateRelativeBetAndCloseness();
+        // take modulus to find the seconds left in today
+        uint today_current_second = (now - secondInit) % auctionLength;
+        require (today_current_second >= 0 && today_current_second <= 3 * auctionLength / 24, "Can only calculate rewards from midnight to 3a.m.");
 
+        // checkIfInsideInterval
+        if (checkIfInsideInterval()) {
+            //calculate parameter for relativeness and sum_relativeness
 
-      } else {
-          //if not inside the interval then agent do not get a reward
-          agent_details[msg.sender][currentDay-2].reward = 0;
+            emit Print("reach inside interval");
+            calculateRelativeBetAndCloseness();
+
+        } else {
+            emit Print("reach not inside interval");
+            //if not inside the interval then agent do not get a reward
+            agent_details[msg.sender][currentDay-2].reward = 0;
+
       }
   }
     function bytes32ToStr(bytes32 _bytes32) public pure returns (string memory) {
@@ -461,7 +476,6 @@ contract DemandBid {
     }
     return string(bytesStringTrimmed);
     }
-
 
 
 }
