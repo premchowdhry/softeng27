@@ -66,7 +66,9 @@ contract DemandBid {
     // Log when address has nothing to withdraw (prediction not inside interval)
     event PredictionNotInsideInterval(string str);
     // Log for printing when debugging
-    event Print(string str);
+    event PrintString(string _string);
+    // Log for printing uint
+    event PrintUint(uint _uint);
 
 
     // https://emn178.github.io/online-tools/keccak_256.html
@@ -187,7 +189,7 @@ contract DemandBid {
     // return the rewardAmount of the msg.sender on the day specify
     // only call this function after calculate reward is already called
     function getRewardAmount(uint day) public view returns (uint) {
-        require (day > 0, "Day < 0 does not exist");
+        require (day >= 0, "Day < 0 does not exist");
         return agent_details[msg.sender][day].reward;
     }
 
@@ -197,14 +199,23 @@ contract DemandBid {
     }
 
     // using 5% interval
+    // find the higher interval
     function findHighestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
-        return round_info[currentDay].settlement_value + round_info[currentDay].settlement_value / 20;
+        require (currentDay > 1, "Can only find highest interval on day2");
+        uint highestInterval = round_info[currentDay-2].settlement_value + round_info[currentDay-2].settlement_value / 20;
+        emit PrintUint(highestInterval);
+        return highestInterval;
+
     }
 
+    //
     function findLowestInterval() private returns (uint) {
         currentDay = (now - secondInit) / auctionLength;
-        return round_info[currentDay].settlement_value - round_info[currentDay].settlement_value / 20;
+        require (currentDay > 1, "Can only find lowest interval on day2");
+        uint lowestInterval = round_info[currentDay-2].settlement_value - round_info[currentDay-2].settlement_value / 20;
+        emit PrintUint(lowestInterval);
+        return lowestInterval;
     }
 
   // get settlementValue from energy supplier and set the settlement Value
@@ -242,7 +253,7 @@ contract DemandBid {
       currentDay = (now - secondInit) / auctionLength;
 
       uint today_current_second = (now - secondInit) % auctionLength;
-      require (today_current_second >= 23 * auctionLength / 24 && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
+      //require (today_current_second >= 23 * auctionLength / 24 && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
       bytes32 hash = keccak256(abi.encodePacked(prediction, password));
       emit keccak256Hash(hash);
@@ -429,17 +440,17 @@ contract DemandBid {
 
         // take modulus to find the seconds left in today
         uint today_current_second = (now - secondInit) % auctionLength;
-        require (today_current_second >= 0 && today_current_second <= 3 * auctionLength / 24, "Can only calculate rewards from midnight to 3a.m.");
+        //require (today_current_second >= 0 && today_current_second <= 3 * auctionLength / 24, "Can only calculate rewards from midnight to 3a.m.");
 
         // checkIfInsideInterval
         if (checkIfInsideInterval()) {
             //calculate parameter for relativeness and sum_relativeness
 
-            emit Print("reach inside interval");
+            emit PrintString("reach inside interval");
             calculateRelativeBetAndCloseness();
 
         } else {
-            emit Print("reach not inside interval");
+            emit PrintString("reach not inside interval");
             //if not inside the interval then agent do not get a reward
             agent_details[msg.sender][currentDay-2].reward = 0;
 
