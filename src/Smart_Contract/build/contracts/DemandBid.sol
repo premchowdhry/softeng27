@@ -391,46 +391,59 @@ contract DemandBid {
 
       uint difference_from_settlement_value = differenceFromSettlementValue();
 
-      uint _relativeness = (1 / difference_from_settlement_value) * agent_details[msg.sender][currentDay-2].betAmount;
+      //calculate relativeness using formula 1/diff * betAmount
+      uint _relativeness = agent_details[msg.sender][currentDay-2].betAmount / difference_from_settlement_value;
+      emit PrintString("calculateRelativeBetAndCloseness");
+      //it prints uint: 5000000000000000000
+      emit PrintUint(_relativeness);
 
       //maybe needs to have a parameter name relative
 
+      // set relativeness value
       agent_details[msg.sender][currentDay-2].relativeness = _relativeness;
+
+      // add relativeness to today's total relativeness
       round_info[currentDay-2].sum_relativeness += _relativeness;
 
   }
 
-  // find the difference between prediction and the actual settlement value
-  // needs to check for 0 (exact number for guess and settlement_value)
-  // if exactly then make equal to 1
-  function differenceFromSettlementValue() private returns (uint) {
+    // find the difference between prediction and the actual settlement value
+    // needs to check for 0 (exact number for guess and settlement_value)
+    // if exactly then make equal to 1
+    function differenceFromSettlementValue() private returns (uint) {
 
+        currentDay = (now - secondInit) / auctionLength;
+
+        require (currentDay > 1);
+
+        uint difference_from_settlement_value;
+
+        // check if they are equal, if yes then return 1
+        if (round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction == 0 ) {
+            difference_from_settlement_value = 1;
+        } else if (agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value == 0) {
+            difference_from_settlement_value = 1;
+        } else if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
+            difference_from_settlement_value = round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction;
+        } else {
+            difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
+        }
+        emit PrintString("Inside differenceFromSettlementValue");
+        emit PrintUint(difference_from_settlement_value);
+        return difference_from_settlement_value;
+    }
+
+    // Can only calculate the reward on the day you withdraw
+    // call in withdraw
+    // only allow to withdraw after 3a.m. on day2
+    function getReward() private {
       currentDay = (now - secondInit) / auctionLength;
 
-      require (currentDay > 1);
-
-      uint difference_from_settlement_value;
-
-      //check if they are equal, if yes then return 1
-      if (round_info[currentDay-2].settlement_value == agent_details[msg.sender][currentDay-2].prediction) {
-          difference_from_settlement_value = 1;
-      } else if (round_info[currentDay-2].settlement_value > agent_details[msg.sender][currentDay-2].prediction) {
-          difference_from_settlement_value = round_info[currentDay-2].settlement_value - agent_details[msg.sender][currentDay-2].prediction;
-      } else {
-          difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
-      }
-      return difference_from_settlement_value;
-  }
-
-  // Can only calculate the reward on the day you withdraw
-  // call in withdraw
-  // only allow to withdraw after 3a.m. on day2
-  function getReward() private {
-      currentDay = (now - secondInit) / auctionLength;
-
-      uint _reward = (agent_details[msg.sender][currentDay-2].relativeness / round_info[currentDay-2].sum_relativeness) * round_info[currentDay-2].total_pot;
-      agent_details[msg.sender][currentDay-2].reward = _reward;
-  }
+        // calculate the reward using formula (relativeness / sum_relativeness) * total_pot
+        uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot / round_info[currentDay-2].sum_relativeness;
+        // update reward to the address
+        agent_details[msg.sender][currentDay-2].reward = _reward;
+    }
 
     // calculate rewards should be called after settlement_value is set after midnight
     // this should be called asap
@@ -456,37 +469,5 @@ contract DemandBid {
 
       }
   }
-    function bytes32ToStr(bytes32 _bytes32) public pure returns (string memory) {
-
-        // string memory str = string(_bytes32);
-        // TypeError: Explicit type conversion not allowed from "bytes32" to "string storage pointer"
-        // thus we should fist convert bytes32 to bytes (to dynamically-sized byte array)
-
-        bytes memory bytesArray = new bytes(32);
-        for (uint i; i < 32; i++) {
-            bytesArray[i] = _bytes32[i];
-            //emit
-        }
-        return string(bytesArray);
-
-    }
-
-    function bytes32ToString(bytes32 x) public pure returns (string memory) {
-    bytes memory bytesString = new bytes(32);
-    uint charCount = 0;
-    for (uint j = 0; j < 32; j++) {
-        byte char = byte(bytes32(uint(x) * 2 ** (8 * j)));
-        if (char != 0) {
-            bytesString[charCount] = char;
-            charCount++;
-        }
-    }
-    bytes memory bytesStringTrimmed = new bytes(charCount);
-    for (uint j = 0; j < charCount; j++) {
-        bytesStringTrimmed[j] = bytesString[j];
-    }
-    return string(bytesStringTrimmed);
-    }
-
 
 }
