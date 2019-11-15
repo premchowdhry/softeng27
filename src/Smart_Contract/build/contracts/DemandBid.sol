@@ -110,17 +110,17 @@ contract DemandBid {
         emit BetSubmission(msg.sender, msg.value, currentDay);
     }
 
-    function getTodayHash() public returns (bytes32) {
+    function getTodayHash() private returns (bytes32) {
         currentDay = (now - secondInit) / auctionLength;
         return agent_details[msg.sender][currentDay].hash_prediction;
     }
 
-    function getYesterdayHash() public  returns (bytes32) {
+    function getYesterdayHash() private returns (bytes32) {
         currentDay = (now - secondInit) / auctionLength;
         return agent_details[msg.sender][currentDay--].hash_prediction;
     }
 
-    function getNow() public view returns (uint) {
+    function getNow() private view returns (uint) {
         uint x = now;
         // return how many seconds have past
         return x - secondInit;
@@ -152,15 +152,22 @@ contract DemandBid {
 
             if (!agent_details[msg.sender][currentDay-2].claimed) {
                 //get reward of the reward that can be withdraw
-                uint ytdReward = agent_details[msg.sender][currentDay--].reward;
+                uint twoDaysAgoReward = agent_details[msg.sender][currentDay-2].reward;
+
+                emit PrintString("Reward not cliamed yet");
+                emit PrintUint(twoDaysAgoReward);
 
                 // only needs to transfer the funds if reward > 0
-                if (ytdReward > 0) {
+                if (twoDaysAgoReward > 0) {
+
+                // REMARK: Maybe need to diveide by 100000000 to send in ether
+                // REMARK: Also maybe need to have if statement that the reward is not greater than the total pot
+
                 // transfer rewards to the agent
-                (msg.sender).transfer((ytdReward));
+                (msg.sender).transfer((twoDaysAgoReward));
 
                 // deduct the withdraw amount from today's total_pot
-                round_info[currentDay-2].total_pot -= ytdReward;
+                round_info[currentDay-2].total_pot -= twoDaysAgoReward;
                 }
             }
         }  else {
@@ -276,97 +283,6 @@ contract DemandBid {
 
   }
 
-    /*
-    // byte32 of prediction+password
-    // first 4 bytes limit to be for prediction, 28 bytes for password
-    function revealBet(bytes32  predictionAndPassword) public returns (bool) {
-        currentDay = (now - secondInit) / auctionLength;
-
-        uint today_current_second = (now - secondInit) % auctionLength;
-        //require (today_current_second >= (22 / 24) * auctionLength && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
-
-        //keccak256 the sring and password
-
-        //convert stringAndPassword to bytes memory
-        //bytes memory stringAndPassword_bytes = abi.encodePacked(predictionAndPassword);
-
-        //bytes32 hash = keccak256(bytes(stringAndPassword_bytes));
-        //emit keccak256Hash(abi.encodePacked(prediction, stringAndPassword));
-        //bytes32 hashes = keccak256(abi.encodePacked(prediction, stringAndPassword));
-
-        //bytes32 hashes = keccak256(abi.encodePacked(bytes32ToStr(predictionAndPassword)));
-        //emit keccak256Hash(hash);
-
-        //bytes32 hash = keccak256((stringPredictionAndPassword));
-
-        //convert bytes32 to string
-        //bytes memory hash_predicition_bytes = abi.encodePacked(agent_details[msg.sender][currentDay].hash_prediction);
-        //bytes32 hash_of_hash_prediction = keccak256(hash_predicition_bytes);
-
-        emit keccak256Hash(hashes);
-        emit HashPrediction(agent_details[msg.sender][currentDay].hash_prediction);
-        //emit HashPrediction(hash_of_hash_prediction);
-
-        //compare the hash with hash_prediction when submit bet
-        if (hashes == agent_details[msg.sender][currentDay].hash_prediction) {
-
-        //trying a sneakey way
-        //if (hash == hash_of_hash_prediction) {
-            uint _prediction = getPredictionFromHash(predictionAndPassword);
-
-            //set the real prediction value
-            agent_details[msg.sender][currentDay].prediction = _prediction;
-
-            emit predictionMatchesHash(_prediction);
-
-            agent_details[msg.sender][currentDay].bet_hashes_correct = true;
-
-            return true;
-
-        } else {
-            agent_details[msg.sender][currentDay].bet_hashes_correct = false;
-
-            return false;
-        }
-
-  }*/
-
-  // needs to write new function for byte32 slicing (mask)
-  // slice the first 4 bytes
-  // get first 32 bits
-  function getPredictionFromHash(bytes32 stringAndPassword) public returns (uint) {
-      // mask
-      uint n = 32;
-      bytes32 nOnes = bytes32(2 ** n - 1);
-      bytes32 mask = shiftLeft(nOnes, 256 - n);
-      bytes32 prediction_in_bytes32 =  stringAndPassword & mask;
-      // print 4 bytes that is extracted
-      emit PredictionInBytes32(prediction_in_bytes32);
-      // shift right by 28 bytes (224 bits)
-      bytes32 prediction_shifted_right = shiftRight(prediction_in_bytes32, 224);
-      emit PredictionInBytes32(prediction_shifted_right);
-
-      return uint(prediction_shifted_right);
-  }
-
-  // shift bytes by 32 bits
-  function shiftLeft(bytes32 a, uint n) private pure returns (bytes32) {
-      uint shifted = uint(a) * 2 ** n;
-      return bytes32(shifted);
-  }
-
-  function getFirstNBytes(bytes1 x, uint8 n) public pure returns (bytes1) {
-      require ( (2 ** n) < 255);
-      bytes1 nOnes = bytes1(2 ** (n - 1));
-      bytes1 mask = nOnes >> (8 - n);
-      return x & mask;
-  }
-
-  function shiftRight(bytes32 a, uint n) private pure returns (bytes32) {
-      return bytes32(uint(a) / 2 ** n);
-  }
-
-
   // check whether the prediction is inside today's interval
   function checkIfInsideInterval() private returns (bool) {
       currentDay = (now - secondInit) / auctionLength;
@@ -395,6 +311,7 @@ contract DemandBid {
       uint _relativeness = agent_details[msg.sender][currentDay-2].betAmount / difference_from_settlement_value;
       emit PrintString("calculateRelativeBetAndCloseness");
       //it prints uint: 5000000000000000000
+      emit PrintString("Relativeness for this account: ");
       emit PrintUint(_relativeness);
 
       //maybe needs to have a parameter name relative
@@ -404,6 +321,8 @@ contract DemandBid {
 
       // add relativeness to today's total relativeness
       round_info[currentDay-2].sum_relativeness += _relativeness;
+      emit PrintString("Sum Relativeness for today: ");
+      emit PrintUint(round_info[currentDay-2].sum_relativeness);
 
   }
 
@@ -441,6 +360,8 @@ contract DemandBid {
 
         // calculate the reward using formula (relativeness / sum_relativeness) * total_pot
         uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot / round_info[currentDay-2].sum_relativeness;
+        emit PrintString("Reward for this account: ");
+        emit PrintUint(_reward);
         // update reward to the address
         agent_details[msg.sender][currentDay-2].reward = _reward;
     }
