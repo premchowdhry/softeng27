@@ -254,6 +254,10 @@ contract DemandBid {
       return keccak256(hash);
     }
 
+    function returnKeccak256OfEncoded(uint prediction, string memory password) public pure returns (bytes32) {
+        return keccak256(returnABIEncodePacked(prediction, password));
+    }
+
     // Place a blinded bid with `_blindedBid` =
     // keccak256(abi.encodePacked(prediction, password)).
     function revealBet(uint prediction, string memory password) public returns (bool) {
