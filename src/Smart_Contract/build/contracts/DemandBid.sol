@@ -246,14 +246,15 @@ contract DemandBid {
     round_info[(currentDay-2)].settlement_is_set = true;
   }
 
-    function returnABIEncodePacked(uint prediction, string memory password) public pure returns (bytes memory) {
+    function returnABIEncodePacked(uint prediction, string memory password) private pure returns (bytes memory) {
       return abi.encodePacked(prediction, password);
     }
 
-    function returnKeccak256(bytes memory hash) public pure returns (bytes32) {
+    function returnKeccak256(bytes memory hash) private pure returns (bytes32) {
       return keccak256(hash);
     }
 
+    // Python can call this function to find the hash of the encode of prediction and password
     function returnKeccak256OfEncoded(uint prediction, string memory password) public pure returns (bytes32) {
         return keccak256(returnABIEncodePacked(prediction, password));
     }
