@@ -286,12 +286,12 @@ contract DemandBid {
 
             //set bet_hashes_correct = true;
             agent_details[msg.sender][currentDay].bet_hashes_correct = true;
-            PrintBoolean(true);
+            emit PrintBoolean(true);
             return true;
 
         } else {
             agent_details[msg.sender][currentDay].bet_hashes_correct = false;
-            PrintBoolean(false);
+            emit PrintBoolean(false);
             return false;
         }
 
@@ -414,6 +414,6 @@ contract DemandBid {
       return round_info[dayNumber].settlement_value;
   }
 
-  function
+
 
 }
