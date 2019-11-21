@@ -48,6 +48,7 @@ contract DemandBid {
         bool bet_hashes_correct;
         bool insideInterval;
         uint relativeness;
+        bool revealBet_hasSet;
     }
 
     // Log the event about a bet submission being made by an address and its prediction
@@ -70,6 +71,8 @@ contract DemandBid {
     event PrintString(string _string);
     // Log for printing uint
     event PrintUint(uint _uint);
+
+    event PrintBoolean(bool _bool);
 
 
     // https://emn178.github.io/online-tools/keccak_256.html
@@ -272,7 +275,7 @@ contract DemandBid {
       //require (today_current_second >= 23 * auctionLength / 24 && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
       bytes32 hash = keccak256(abi.encodePacked(prediction, password));
-      emit keccak256Hash(hash);
+      //emit keccak256Hash(hash);
 
       if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
 
@@ -283,10 +286,12 @@ contract DemandBid {
 
             //set bet_hashes_correct = true;
             agent_details[msg.sender][currentDay].bet_hashes_correct = true;
+            PrintBoolean(true);
             return true;
 
         } else {
             agent_details[msg.sender][currentDay].bet_hashes_correct = false;
+            PrintBoolean(false);
             return false;
         }
 
@@ -403,5 +408,12 @@ contract DemandBid {
 
       }
   }
+
+  // return settlement_value of day that make prediction
+  function getSettlementValue(uint dayNumber) public view returns (uint) {
+      return round_info[dayNumber].settlement_value;
+  }
+
+  function
 
 }
