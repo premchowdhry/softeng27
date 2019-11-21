@@ -193,7 +193,7 @@ contract DemandBid {
         if (round_info[currentDay-3].total_pot > 0) {
 
             // update total_pot with leftover
-            round_info[currentDay-2].total_pot += round_info[currentDay-3].total_pot;
+            round_info[currentDay-2].total_pot_constant += round_info[currentDay-3].total_pot;
         }
     }
 
