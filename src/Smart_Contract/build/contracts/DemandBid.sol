@@ -29,7 +29,8 @@ contract DemandBid {
     struct Round {
         uint date;
         uint number_of_players;
-        uint total_pot;
+        uint total_pot;             // today's total pot rrelative
+        uint total_pot_constant;    // today's total pot which will never get deducted
         uint settlement_value;
         uint higherInterval;
         uint lowerInterval;
@@ -106,6 +107,8 @@ contract DemandBid {
 
         // increment total_pot with the bet amount
         round_info[currentDay].total_pot += msg.value;
+        // increment ttotal_pot_constant with the bet amount
+        round_info[currentDay].total_pot_constant += msg.value;
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
     }
@@ -145,12 +148,13 @@ contract DemandBid {
 
         if (agent_details[msg.sender][currentDay-2].insideInterval) {
 
-            // call getReward() to calculate what reward this address can claimed
-            // can only be called after all agents called calculateReward()
-            // only needs to call getReward() if it is inside interval
-            getReward();
-
             if (!agent_details[msg.sender][currentDay-2].claimed) {
+
+                // call getReward() to calculate what reward this address can claimed
+                // can only be called after all agents called calculateReward()
+                // only needs to call getReward() if it is inside interval
+                getReward();
+
                 //get reward of the reward that can be withdraw
                 uint twoDaysAgoReward = agent_details[msg.sender][currentDay-2].reward;
 
@@ -331,6 +335,7 @@ contract DemandBid {
 
   }
 
+
     // find the difference between prediction and the actual settlement value
     // needs to check for 0 (exact number for guess and settlement_value)
     // if exactly then make equal to 1
@@ -352,6 +357,7 @@ contract DemandBid {
         } else {
             difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
         }
+
         emit PrintString("Inside differenceFromSettlementValue");
         emit PrintUint(difference_from_settlement_value);
         return difference_from_settlement_value;
@@ -364,12 +370,14 @@ contract DemandBid {
       currentDay = (now - secondInit) / auctionLength;
 
         // calculate the reward using formula (relativeness / sum_relativeness) * total_pot
-        uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot / round_info[currentDay-2].sum_relativeness;
+        uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot_constant / round_info[currentDay-2].sum_relativeness;
         emit PrintString("Reward for this account: ");
         emit PrintUint(_reward);
         // update reward to the address
         agent_details[msg.sender][currentDay-2].reward = _reward;
     }
+
+
 
     // calculate rewards should be called after settlement_value is set after midnight
     // this should be called asap
