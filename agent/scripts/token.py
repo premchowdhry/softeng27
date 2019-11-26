@@ -1,36 +1,97 @@
 #!/usr/bin/python3
 import time
-from brownie import *
+from brownie import accounts, convert, DemandBid
+
+import requests
+
+headers = {
+    'Content-Type': 'application/json',
+}
+
+data = '{"dataset_size": "100"}'
+
 
 daytime = 5
 
+
+def getPrediction(text):
+    begin = 0
+    end = len(text)
+
+
+    for i in range(len(text)):
+
+        if(text[i] == 91):
+            begin = i+1
+            break
+    for j in range(begin,len(text)):
+        if(text[j] == 32):
+            end = j
+            break
+
+
+
+    return int(str(text[begin:end], 'utf-8'))
+
 def main():
     accounts[0].deploy(DemandBid, daytime)
-    prediction = 100
-    password = 'there'
-    password2 = 'theree'
+    response = requests.post('http://ec2-3-135-228-177.us-east-2.compute.amazonaws.com:80/predict', headers=headers, data=data)
+    prediction = getPrediction(response.content)
+    print(prediction)
+
+
+    prediction = 4200
+    print(prediction)
+    password = "there"
+    print("CurrentDay")
+    print(DemandBid[0].getCurrentDay())
     bet = bytes(DemandBid[0].returnKeccak256OfEncoded(prediction, password))
-    print(bet)
-
     DemandBid[0].submitBet.transact(bet, {'value':'5 ether','from': accounts[1]})
+    print('hash at submit')
+    print(DemandBid[0].getHash())
 
-    time.sleep(daytime*23/24)
 
-    result = DemandBid[0].revealBet(prediction, password)
-    print(type(result))
+    print("CurrentDay")
+    print(DemandBid[0].getCurrentDay())
+    DemandBid[0].revealBet(prediction, password, {'from': accounts[1]})
 
-    time.sleep(daytime/24)
-    time.sleep(daytime)
+    print('revealDone')
+    print(DemandBid[0].getRevealedBet())
+    print('hash at reveal')
+    print(DemandBid[0].getHash())
 
-    DemandBid[0].setSettlementValue(0, {'from': accounts[0]})
+
+
+
+    #time.sleep(daytime/24)
+
+    time.sleep(2*daytime)
+
+
+
+    print("CurrentDay")
+    print(DemandBid[0].getCurrentDay())
+
+    DemandBid[0].setSettlementValue(4300, {'from': accounts[0]})
+    print('settlement')
+    print(DemandBid[0].getSettlementValue(0))
+    print('senderpredict')
+    print(DemandBid[0].getSenderPrediction({'from': accounts[1]}))
+    print("CurrentDay")
+    print(DemandBid[0].getCurrentDay())
+
     DemandBid[0].calculateReward({'from': accounts[1]})
-    value = DemandBid[0].getRewardAmount(0,{'from': accounts[1]})
+    print('result')
+    print(DemandBid[0].getResult())
 
-    print(value)
 
     time.sleep(daytime*3/24)
 
     DemandBid[0].withdraw({'from': accounts[1]})
+
+    value = DemandBid[0].getRewardAmount(0, {'from': accounts[1]})
+    print('After withdraw')
+    print(value)
 
     print(DemandBid[0].balance())
     print(accounts[0].balance())

@@ -29,7 +29,8 @@ contract DemandBid {
     struct Round {
         uint date;
         uint number_of_players;
-        uint total_pot;
+        uint total_pot;             // today's total pot rrelative
+        uint total_pot_constant;    // today's total pot which will never get deducted
         uint settlement_value;
         uint higherInterval;
         uint lowerInterval;
@@ -47,6 +48,7 @@ contract DemandBid {
         bool bet_hashes_correct;
         bool insideInterval;
         uint relativeness;
+        bool revealBet_hasSet;
     }
 
     // Log the event about a bet submission being made by an address and its prediction
@@ -70,6 +72,15 @@ contract DemandBid {
     // Log for printing uint
     event PrintUint(uint _uint);
 
+    event PrintBoolean(bool _bool);
+    bytes32 hashNow = 0;
+    function getHash() public view returns (bytes32) {
+        return hashNow;
+    }
+
+    function getCurrentDay() public view returns (uint) {
+        return currentDay;
+    }
 
     // https://emn178.github.io/online-tools/keccak_256.html
     // Agent needs to go to this website to hash the bet first
@@ -98,6 +109,7 @@ contract DemandBid {
 
         //set hash_prediction = _blindedBid (arguments when this function is called)
         agent_details[msg.sender][currentDay].hash_prediction = _blindedBid;
+        hashNow = agent_details[msg.sender][currentDay].hash_prediction;
 
         // PS needs to initialise the reward = 0 after getting commit reveal scheme to work
         agent_details[msg.sender][currentDay].reward = msg.value;
@@ -106,6 +118,8 @@ contract DemandBid {
 
         // increment total_pot with the bet amount
         round_info[currentDay].total_pot += msg.value;
+        // increment ttotal_pot_constant with the bet amount
+        round_info[currentDay].total_pot_constant += msg.value;
         round_info[currentDay].number_of_players += 1;
         emit BetSubmission(msg.sender, msg.value, currentDay);
     }
@@ -145,12 +159,13 @@ contract DemandBid {
 
         if (agent_details[msg.sender][currentDay-2].insideInterval) {
 
-            // call getReward() to calculate what reward this address can claimed
-            // can only be called after all agents called calculateReward()
-            // only needs to call getReward() if it is inside interval
-            getReward();
-
             if (!agent_details[msg.sender][currentDay-2].claimed) {
+
+                // call getReward() to calculate what reward this address can claimed
+                // can only be called after all agents called calculateReward()
+                // only needs to call getReward() if it is inside interval
+                getReward();
+
                 //get reward of the reward that can be withdraw
                 uint twoDaysAgoReward = agent_details[msg.sender][currentDay-2].reward;
 
@@ -188,9 +203,23 @@ contract DemandBid {
         // only needs to update the pot if there is leftover
         if (round_info[currentDay-3].total_pot > 0) {
 
+
             // update total_pot with leftover
+            round_info[currentDay-2].total_pot_constant += round_info[currentDay-3].total_pot;
             round_info[currentDay-2].total_pot += round_info[currentDay-3].total_pot;
+
+            round_info[currentDay-3].total_pot = 0;
         }
+    }
+
+    function getTotalPot(uint day) public view returns (uint) {
+      require (day >= 0);
+      return round_info[day].total_pot;
+    }
+
+    function getTotalPotConstant(uint day) public view returns (uint) {
+      require (day >= 0);
+      return round_info[day].total_pot_constant;
     }
 
     // return the rewardAmount of the msg.sender on the day specify
@@ -258,6 +287,12 @@ contract DemandBid {
     function returnKeccak256OfEncoded(uint prediction, string memory password) public pure returns (bytes32) {
         return keccak256(returnABIEncodePacked(prediction, password));
     }
+    bool revealDone = false;
+
+    function getRevealedBet() public view returns (bool) {
+        return revealDone;
+    }
+
 
     // Place a blinded bid with `_blindedBid` =
     // keccak256(abi.encodePacked(prediction, password)).
@@ -268,7 +303,9 @@ contract DemandBid {
       //require (today_current_second >= 23 * auctionLength / 24 && today_current_second <= auctionLength, "Can only reveal bet from 11pm-12pm");
 
       bytes32 hash = keccak256(abi.encodePacked(prediction, password));
-      emit keccak256Hash(hash);
+      //emit keccak256Hash(hash);
+      hashNow = agent_details[msg.sender][currentDay].hash_prediction;
+
 
       if (hash == agent_details[msg.sender][currentDay].hash_prediction) {
 
@@ -279,10 +316,14 @@ contract DemandBid {
 
             //set bet_hashes_correct = true;
             agent_details[msg.sender][currentDay].bet_hashes_correct = true;
+            emit PrintBoolean(true);
+            revealDone = true;
             return true;
 
         } else {
             agent_details[msg.sender][currentDay].bet_hashes_correct = false;
+            emit PrintBoolean(false);
+            revealDone = false;
             return false;
         }
 
@@ -301,6 +342,10 @@ contract DemandBid {
       }
       return false;
 
+  }
+
+  function getSenderPrediction() public view returns (uint) {
+      return agent_details[msg.sender][currentDay-2].prediction;
   }
 
   // calculate the relativeness value and set the relativeness in the struct at the end
@@ -331,6 +376,7 @@ contract DemandBid {
 
   }
 
+
     // find the difference between prediction and the actual settlement value
     // needs to check for 0 (exact number for guess and settlement_value)
     // if exactly then make equal to 1
@@ -352,6 +398,7 @@ contract DemandBid {
         } else {
             difference_from_settlement_value = agent_details[msg.sender][currentDay-2].prediction - round_info[currentDay-2].settlement_value;
         }
+
         emit PrintString("Inside differenceFromSettlementValue");
         emit PrintUint(difference_from_settlement_value);
         return difference_from_settlement_value;
@@ -364,11 +411,15 @@ contract DemandBid {
       currentDay = (now - secondInit) / auctionLength;
 
         // calculate the reward using formula (relativeness / sum_relativeness) * total_pot
-        uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot / round_info[currentDay-2].sum_relativeness;
+        uint _reward = agent_details[msg.sender][currentDay-2].relativeness  * round_info[currentDay-2].total_pot_constant / round_info[currentDay-2].sum_relativeness;
         emit PrintString("Reward for this account: ");
         emit PrintUint(_reward);
         // update reward to the address
         agent_details[msg.sender][currentDay-2].reward = _reward;
+    }
+    bool result = false;
+    function getResult() public view returns (bool) {
+        return result;
     }
 
     // calculate rewards should be called after settlement_value is set after midnight
@@ -387,13 +438,22 @@ contract DemandBid {
 
             emit PrintString("reach inside interval");
             calculateRelativeBetAndCloseness();
+            result = true;
 
         } else {
             emit PrintString("reach not inside interval");
             //if not inside the interval then agent do not get a reward
             agent_details[msg.sender][currentDay-2].reward = 0;
+            result = false;
 
       }
   }
+
+  // return settlement_value of day that make prediction
+  function getSettlementValue(uint dayNumber) public view returns (uint) {
+      return round_info[dayNumber].settlement_value;
+  }
+
+
 
 }
