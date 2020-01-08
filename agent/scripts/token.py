@@ -5,10 +5,10 @@ from brownie import accounts, convert, DemandBid
 import requests
 
 headers = {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
 }
 
-data = '{"dataset_size": "100"}'
+data = {"dataset_size": "100"}
 
 
 daytime = 5
@@ -31,16 +31,18 @@ def getPrediction(text):
 
 
 
-    return int(str(text[begin:end], 'utf-8'))
+    return float(str(text[begin:end], 'utf-8'))
 
 def main():
     accounts[0].deploy(DemandBid, daytime)
-    response = requests.post('http://ec2-3-135-228-177.us-east-2.compute.amazonaws.com:80/predict', headers=headers, data=data)
-    prediction = getPrediction(response.content)
-    print(prediction)
+    response = requests.post('http://ec2-18-191-230-57.us-east-2.compute.amazonaws.com:80/predict')
+    values = response.content
+    prediction, actual, std_dev = values.split()
+    print(prediction, std_dev)
 
 
-    prediction = 4200
+    prediction = float(prediction) * 1000
+    settlement = float(actual) * 1000
     print(prediction)
     password = "there"
     print("CurrentDay")
@@ -72,7 +74,7 @@ def main():
     print("CurrentDay")
     print(DemandBid[0].getCurrentDay())
 
-    DemandBid[0].setSettlementValue(4300, {'from': accounts[0]})
+    DemandBid[0].setSettlementValue(settlement, {'from': accounts[0]})
     print('settlement')
     print(DemandBid[0].getSettlementValue(0))
     print('senderpredict')
