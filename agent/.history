@@ -20,3 +20,9 @@ DemandBid[0].submitBet.transact(bet,\040{'value':'5\040ether','from':\040account
 bet\040=\040bytes(DemandBid[0].returnKeccak256OfEncoded(2000,'hello'\040))
 DemandBid[0].submitBet.transact(bet,\040{'value':'5\040ether','from':\040accounts[1]})
 exit()
+accounts[0]
+accounts[0].transfer(accounts[1],\040"10\040ether")
+accounts[0].deploy(DemandBid,\04030)
+DemandBid
+exit
+exit()
