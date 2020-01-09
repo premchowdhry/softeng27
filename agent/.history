@@ -26,3 +26,5 @@ accounts[0].deploy(DemandBid,\04030)
 DemandBid
 exit
 exit()
+mnemonic
+exit()

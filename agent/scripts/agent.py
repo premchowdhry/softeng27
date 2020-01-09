@@ -17,12 +17,14 @@ class Agent(Thread):
         self.prediction = None
 
     def get_prediction(self):
-        # headers = {
-        #     'Content-Type': 'application/json',
-        # }
-        # data = '{"dataset_size": "100"}'
-        # response = requests.post(ec2_dns, headers=headers, data=data)
-        # self.prediction = int(response.content)
+        # if self.num == 1:
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #     }
+        #     data = '{"dataset_size": "100"}'
+        #     response = requests.post(ec2_dns, headers=headers, data=data)
+        #     self.prediction = int(response.content)
+        # else:
         self.prediction = 4100
 
     def submit_bet(self, amount):

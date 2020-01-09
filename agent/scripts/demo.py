@@ -11,6 +11,8 @@ def main():
     for i in range(6):
         if i == 0:
             oracle = Oracle(0, "oracle", daytime, rounds, settlements)
+        # elif i == 1:
+        #     agents.append(Agent(i, "agent{0}".format(i), "", daytime, rounds))
         else:
             agents.append(Agent(i, "agent{0}".format(i), "", daytime, rounds))
 
