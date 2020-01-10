@@ -1,20 +1,8 @@
 {
   "contracts": {
-    "DemandBid": "c77773410ef29d2f62a0b091e85942cdb1fdf287",
-    "SafeMath": "7aa763f68a00f23cc4b8ed2e8095a108af6f6621",
-    "Token": "6cfd9c04544c4b616e189a5dd959997a90bef492"
+    "DemandBid": "c77773410ef29d2f62a0b091e85942cdb1fdf287"
   },
   "tests": {
-    "tests/test_approve_transferFrom.py": {
-      "coverage": false,
-      "isolated": [
-        "SafeMath",
-        "Token"
-      ],
-      "results": "......",
-      "sha1": "9216f6af66cceed42162a7b4dafa6804a5aaa2b1",
-      "txhash": []
-    },
     "tests/test_multiple_days.py": {
       "coverage": false,
       "isolated": [
@@ -31,16 +19,6 @@
       ],
       "results": ".",
       "sha1": "0efeed40433e5073283efc71e9aae85f19e2d4eb",
-      "txhash": []
-    },
-    "tests/test_transfer.py": {
-      "coverage": false,
-      "isolated": [
-        "SafeMath",
-        "Token"
-      ],
-      "results": ".",
-      "sha1": "d7090afc1384da594359b469c1783ec37c3ed7b0",
       "txhash": []
     }
   },
