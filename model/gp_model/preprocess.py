@@ -6,7 +6,7 @@ import dask.dataframe as dd
 import datetime as dt
 
 # Example of data
-ENERGY_DATASET = 'src/dataset/Power-Networks-LCL-June2015(withAcornGps)v2.csv'
+ENERGY_DATASET = 'src/model/dataset/<name_of_dataset>'
 USER = 'MAC000002'
 columns = ['id', 'rate', 'dateTime', 'usage', 'Acorn', 'Acorn_grouped']
 to_drop = ['rate', 'Acorn', 'Acorn_grouped']
